@@ -41,7 +41,7 @@ namespace Vancat.OllamaCloudUsage.Services
         {
             _filePath = filePath ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Vancat", "OllamaCloudUsage", "accounts.json");
+                "vancat", "OllamaCloudUsage", "accounts.json");
         }
 
         public AccountsState Load()

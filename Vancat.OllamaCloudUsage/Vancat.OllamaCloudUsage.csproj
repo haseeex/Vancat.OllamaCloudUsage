@@ -8,11 +8,11 @@
     <Nullable>disable</Nullable>
     <RootNamespace>Vancat.OllamaCloudUsage</RootNamespace>
     <AssemblyName>Vancat.OllamaCloudUsage</AssemblyName>
-    <Version>1.2.1</Version>
-    <Authors>Vancat</Authors>
+    <Version>1.2.2</Version>
+    <Authors>vancat</Authors>
     <Product>Ollama Cloud 用量监控</Product>
     <Description>在 Visual Studio 中查看 Ollama Cloud 用量与限额。</Description>
-    <Copyright>Copyright © Vancat 2026</Copyright>
+    <Copyright>Copyright © vancat 2026 (https://github.com/haseeex/Vancat.OllamaCloudUsage)</Copyright>
 
     <!-- VSIX 打包设置 -->
     <VSSDKBuildToolsAutoSetup>true</VSSDKBuildToolsAutoSetup>

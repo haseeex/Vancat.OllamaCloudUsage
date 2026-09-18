@@ -27,7 +27,7 @@ namespace Vancat.OllamaCloudUsage.Services
         {
             _filePath = filePath ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Vancat", "OllamaCloudUsage", "usage-cache.json");
+                "vancat", "OllamaCloudUsage", "usage-cache.json");
         }
 
         public string FilePath => _filePath;
