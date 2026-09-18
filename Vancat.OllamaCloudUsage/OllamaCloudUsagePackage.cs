@@ -14,7 +14,7 @@ namespace Vancat.OllamaCloudUsage
 {
     /// <summary>Ollama Cloud 用量监控扩展主包。</summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("Ollama Cloud 用量监控", "在 Visual Studio 中查看 Ollama Cloud 用量与限额。", "1.1.1")]
+    [InstalledProductRegistration("Ollama Cloud 用量监控", "在 Visual Studio 中查看 Ollama Cloud 用量与限额。", "1.1.2")]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideToolWindow(typeof(UsageToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids.SolutionExplorer)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]

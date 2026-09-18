@@ -71,8 +71,19 @@ namespace Vancat.OllamaCloudUsage.Services
                     return _inFlight;
                 }
 
-                _inFlight = DoRefreshAsync(force);
-                return _inFlight;
+                var task = DoRefreshAsync(force);
+
+                // 关键：DoRefreshAsync 可能「同步完成」（例如命中新鲜缓存、
+                // 未配置账户、空账户等提前 return 的路径）。此时它的 finally
+                // 已在上面这行赋值之前执行、把 _inFlight 清空；若这里再把
+                // 「已完成的任务」写回 _inFlight，之后所有刷新调用都会直接
+                // 返回这个陈旧任务而不再执行任何工作，导致界面永不更新。
+                if (!task.IsCompleted)
+                {
+                    _inFlight = task;
+                }
+
+                return task;
             }
         }
 
