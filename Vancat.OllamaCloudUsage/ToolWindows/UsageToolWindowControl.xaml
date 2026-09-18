@@ -23,7 +23,7 @@
                     <Button x:Name="SettingsButton" Content="⚙" Width="28" Height="26"
                             ToolTip="设置自动刷新间隔" Click="OnSettings" />
                 </StackPanel>
-                <TextBlock Text="☁ 云端用量" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock x:Name="TitleText" Text="☁ 云端用量" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
             </DockPanel>
 
             <!-- 账户选择行 -->
@@ -46,14 +46,14 @@
             <StackPanel x:Name="SessionPanel" Visibility="Collapsed">
                 <DockPanel Margin="0,0,0,6">
                     <TextBlock DockPanel.Dock="Right" x:Name="SessionPercent" FontSize="12" FontWeight="SemiBold" />
-                    <TextBlock Text="5 小时窗口用量" FontSize="13" FontWeight="Medium" />
+                    <TextBlock x:Name="SessionTitle" Text="5 小时窗口用量" FontSize="13" FontWeight="Medium" />
                 </DockPanel>
                 <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
                     <Grid x:Name="SessionBar" />
                 </Border>
                 <TextBlock x:Name="SessionReset" FontSize="11" Margin="0,5,0,0"
                            Foreground="{StaticResource DescBrush}" />
-                <TextBlock Text="本窗口使用的模型" FontSize="11" Margin="0,16,0,6"
+                <TextBlock x:Name="SessionModelsLabel" Text="本窗口使用的模型" FontSize="11" Margin="0,16,0,6"
                            Foreground="{StaticResource DescBrush}" />
                 <StackPanel x:Name="SessionModels" />
             </StackPanel>
@@ -64,21 +64,21 @@
             <StackPanel x:Name="WeeklyPanel" Visibility="Collapsed">
                 <DockPanel Margin="0,0,0,6">
                     <TextBlock DockPanel.Dock="Right" x:Name="WeeklyPercent" FontSize="12" FontWeight="SemiBold" />
-                    <TextBlock Text="每周窗口用量" FontSize="13" FontWeight="Medium" />
+                    <TextBlock x:Name="WeeklyTitle" Text="每周窗口用量" FontSize="13" FontWeight="Medium" />
                 </DockPanel>
                 <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
                     <Grid x:Name="WeeklyBar" />
                 </Border>
                 <TextBlock x:Name="WeeklyReset" FontSize="11" Margin="0,5,0,0"
                            Foreground="{StaticResource DescBrush}" />
-                <TextBlock Text="本周使用的模型" FontSize="11" Margin="0,16,0,6"
+                <TextBlock x:Name="WeeklyModelsLabel" Text="本周使用的模型" FontSize="11" Margin="0,16,0,6"
                            Foreground="{StaticResource DescBrush}" />
                 <StackPanel x:Name="WeeklyModels" />
             </StackPanel>
 
             <!-- 活动摘要 -->
             <StackPanel x:Name="ActivityPanel" Visibility="Collapsed" Margin="0,18,0,0">
-                <TextBlock Text="活动" FontSize="11" Foreground="{StaticResource DescBrush}" Margin="0,0,0,6" />
+                <TextBlock x:Name="ActivityLabel" Text="活动" FontSize="11" Foreground="{StaticResource DescBrush}" Margin="0,0,0,6" />
                 <TextBlock x:Name="ActivityText" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
 

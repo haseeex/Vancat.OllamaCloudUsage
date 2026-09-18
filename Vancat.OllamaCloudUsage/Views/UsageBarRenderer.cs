@@ -61,7 +61,7 @@ namespace Vancat.OllamaCloudUsage.Views
                 var segment = new Border
                 {
                     Background = BrushFor(i),
-                    ToolTip = $"{model.Name}\n{model.RequestCount:N0} 次请求",
+                    ToolTip = $"{model.Name}\n{Loc.T("Models.Requests", model.RequestCount.ToString("N0"))}",
                 };
                 Grid.SetColumn(segment, i);
                 host.Children.Add(segment);
@@ -83,7 +83,7 @@ namespace Vancat.OllamaCloudUsage.Views
             {
                 host.Children.Add(new TextBlock
                 {
-                    Text = "无模型请求",
+                    Text = Loc.T("Models.None"),
                     FontSize = fontSize,
                     Foreground = MutedBrush,
                 });
@@ -97,7 +97,7 @@ namespace Vancat.OllamaCloudUsage.Views
 
                 var count = new TextBlock
                 {
-                    Text = $"{model.RequestCount:N0} 次",
+                    Text = Loc.T("Models.Requests", model.RequestCount.ToString("N0")),
                     FontSize = fontSize,
                     Foreground = MutedBrush,
                     VerticalAlignment = VerticalAlignment.Center,

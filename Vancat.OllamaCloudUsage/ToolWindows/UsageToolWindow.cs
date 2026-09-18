@@ -13,7 +13,7 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
         public UsageToolWindow() : base(null)
         {
-            Caption = "Ollama Cloud 用量";
+            Caption = Loc.T("Window.Title");
         }
 
         protected override void Initialize()

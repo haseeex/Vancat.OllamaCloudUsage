@@ -12,7 +12,11 @@ namespace Vancat.OllamaCloudUsage
         {
             InitializeComponent();
             Title = title;
-            PromptText.Text = "请选择账户：";
+            PromptText.Text = Loc.T("Dlg.PickAccountPrompt");
+
+            // 按钮文本跟随当前语言。
+            OkButton.Content = Loc.T("Dlg.Ok");
+            CancelButton.Content = Loc.T("Dlg.Cancel");
 
             foreach (var account in state.Accounts)
             {

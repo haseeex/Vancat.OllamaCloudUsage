@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="Vancat.OllamaCloudUsage" Version="1.1.2" Language="zh-CN" Publisher="Vancat" />
+    <Identity Id="Vancat.OllamaCloudUsage" Version="1.2.0" Language="zh-CN" Publisher="Vancat" />
     <DisplayName>Ollama Cloud 用量监控</DisplayName>
     <Description xml:space="preserve">在 Visual Studio 中查看 Ollama Cloud 用量与限额。
 

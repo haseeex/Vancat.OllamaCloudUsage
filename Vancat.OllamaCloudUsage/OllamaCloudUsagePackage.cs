@@ -14,7 +14,7 @@ namespace Vancat.OllamaCloudUsage
 {
     /// <summary>Ollama Cloud 用量监控扩展主包。</summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("Ollama Cloud 用量监控", "在 Visual Studio 中查看 Ollama Cloud 用量与限额。", "1.1.2")]
+    [InstalledProductRegistration("Ollama Cloud 用量监控", "在 Visual Studio 中查看 Ollama Cloud 用量与限额。", "1.2.0")]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideToolWindow(typeof(UsageToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids.SolutionExplorer)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
@@ -31,6 +31,7 @@ namespace Vancat.OllamaCloudUsage
         private StatusBarManager _statusBar;
         private System.Threading.Timer _refreshTimer;
         private System.Threading.Timer _injectTimer;
+        private (OleMenuCommand Command, string Key)[] _menuCommands;
 
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
@@ -108,6 +109,7 @@ namespace Vancat.OllamaCloudUsage
                 _refreshTimer?.Dispose();
                 _injectTimer?.Dispose();
                 UsageService.Updated -= OnUsageUpdated;
+                Loc.LanguageChanged -= OnLanguageChangedForMenu;
                 UsageService?.Dispose();
                 _statusBar?.Dispose();
             }
@@ -119,25 +121,77 @@ namespace Vancat.OllamaCloudUsage
         {
             var cmdSet = new Guid("B6D4E8F2-1A3C-4E5F-9B7D-2C8A6F4E1B93");
 
-            commandService.AddCommand(new MenuCommand(
+            var refreshCmd = new OleMenuCommand(
                 (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = RefreshUsageAsync(); },
-                new CommandID(cmdSet, 0x0100)));
-
-            commandService.AddCommand(new MenuCommand(
+                new CommandID(cmdSet, 0x0100));
+            var openPanelCmd = new OleMenuCommand(
                 (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); OpenUsagePanel(); },
-                new CommandID(cmdSet, 0x0101)));
-
-            commandService.AddCommand(new MenuCommand(
+                new CommandID(cmdSet, 0x0101));
+            var addAccountCmd = new OleMenuCommand(
                 (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = AddAccountAsync(); },
-                new CommandID(cmdSet, 0x0102)));
-
-            commandService.AddCommand(new MenuCommand(
+                new CommandID(cmdSet, 0x0102));
+            var removeAccountCmd = new OleMenuCommand(
                 (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = RemoveAccountAsync(); },
-                new CommandID(cmdSet, 0x0103)));
-
-            commandService.AddCommand(new MenuCommand(
+                new CommandID(cmdSet, 0x0103));
+            var setIntervalCmd = new OleMenuCommand(
                 (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = SetRefreshIntervalAsync(); },
-                new CommandID(cmdSet, 0x0104)));
+                new CommandID(cmdSet, 0x0104));
+            var toggleLangCmd = new OleMenuCommand(
+                (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = ToggleLanguageAsync(); },
+                new CommandID(cmdSet, 0x0105));
+
+            commandService.AddCommand(refreshCmd);
+            commandService.AddCommand(openPanelCmd);
+            commandService.AddCommand(addAccountCmd);
+            commandService.AddCommand(removeAccountCmd);
+            commandService.AddCommand(setIntervalCmd);
+            commandService.AddCommand(toggleLangCmd);
+
+            // 菜单文本跟随语言切换（VSCT 里的初始文本为中文）。
+            _menuCommands = new (OleMenuCommand Command, string Key)[]
+            {
+                (refreshCmd, "Cmd.Refresh"),
+                (openPanelCmd, "Cmd.OpenPanel"),
+                (addAccountCmd, "Cmd.AddAccount"),
+                (removeAccountCmd, "Cmd.RemoveAccount"),
+                (setIntervalCmd, "Cmd.SetInterval"),
+                (toggleLangCmd, "Cmd.ToggleLang"),
+            };
+            ApplyMenuLanguage();
+
+            Loc.LanguageChanged += OnLanguageChangedForMenu;
+        }
+
+        /// <summary>语言切换时更新菜单文本。</summary>
+        private void OnLanguageChangedForMenu(object sender, EventArgs e)
+        {
+            _ = JoinableTaskFactory.RunAsync(async () =>
+            {
+                await JoinableTaskFactory.SwitchToMainThreadAsync();
+                ApplyMenuLanguage();
+            });
+        }
+
+        /// <summary>应用当前语言到所有菜单命令文本。</summary>
+        private void ApplyMenuLanguage()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (_menuCommands == null)
+            {
+                return;
+            }
+
+            foreach (var (command, key) in _menuCommands)
+            {
+                try
+                {
+                    command.Text = Loc.T(key);
+                }
+                catch
+                {
+                    // 命令表尚未就绪时忽略。
+                }
+            }
         }
 
         internal void OpenUsagePanel()
@@ -147,7 +201,7 @@ namespace Vancat.OllamaCloudUsage
             if (window?.Frame == null)
             {
                 VsShellUtilities.ShowMessageBox(
-                    this, "无法创建用量面板窗口。", "Ollama Cloud 用量",
+                    this, Loc.T("Msg.CannotCreatePanel"), Loc.T("Window.Title"),
                     OLEMSGICON.OLEMSGICON_WARNING, OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
                 return;
             }
@@ -192,7 +246,7 @@ namespace Vancat.OllamaCloudUsage
                 return;
             }
 
-            var picked = PickAccount(state, "选择要移除的账户");
+            var picked = PickAccount(state, Loc.T("Dlg.RemoveAccountTitle"));
             if (picked == null)
             {
                 return;
@@ -217,6 +271,19 @@ namespace Vancat.OllamaCloudUsage
             await UsageService.RefreshAsync(true).ConfigureAwait(false);
         }
 
+        /// <summary>在中英文之间切换界面语言。</summary>
+        internal async Task ToggleLanguageAsync()
+        {
+            await JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            Loc.Current = Loc.IsChinese
+                ? AppLanguage.English
+                : AppLanguage.Chinese;
+
+            // 语言切换后重刷一次，让错误消息等动态文本也更新。
+            await UsageService.RefreshAsync(true).ConfigureAwait(false);
+        }
+
         internal void SwitchAccount(string id)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -238,16 +305,23 @@ namespace Vancat.OllamaCloudUsage
         private string PromptForAccountLabel()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var dialog = new InputDialog("添加账户", "账户名称（例如：工作、个人）", string.Empty, value =>
-                string.IsNullOrWhiteSpace(value) ? "名称不能为空。" : null);
+            var dialog = new InputDialog(
+                Loc.T("Dlg.AddAccountTitle"),
+                Loc.T("Dlg.AccountLabel"),
+                string.Empty,
+                value => string.IsNullOrWhiteSpace(value) ? Loc.T("Dlg.AccountLabelRequired") : null);
             return dialog.ShowDialog() == true ? dialog.Value : null;
         }
 
         private string PromptForApiKey()
         {
             ThreadHelper.ThrowIfNotOnUIThread();
-            var dialog = new InputDialog("添加账户", "输入 Ollama API 密钥", string.Empty, value =>
-                string.IsNullOrWhiteSpace(value) ? "API 密钥不能为空。" : null, isPassword: true);
+            var dialog = new InputDialog(
+                Loc.T("Dlg.AddAccountTitle"),
+                Loc.T("Dlg.ApiKey"),
+                string.Empty,
+                value => string.IsNullOrWhiteSpace(value) ? Loc.T("Dlg.ApiKeyRequired") : null,
+                isPassword: true);
             return dialog.ShowDialog() == true ? dialog.Value : null;
         }
 
@@ -256,19 +330,19 @@ namespace Vancat.OllamaCloudUsage
             ThreadHelper.ThrowIfNotOnUIThread();
             var current = Config.GetRefreshIntervalSeconds();
             var dialog = new InputDialog(
-                "设置自动刷新间隔",
-                $"自动刷新间隔（秒），范围 {Config.MinRefreshIntervalSeconds}–{Config.MaxRefreshIntervalSeconds}",
+                Loc.T("Dlg.IntervalTitle"),
+                Loc.T("Dlg.IntervalPrompt", Config.MinRefreshIntervalSeconds, Config.MaxRefreshIntervalSeconds),
                 current.ToString(),
                 value =>
                 {
                     if (!int.TryParse(value?.Trim(), out var n))
                     {
-                        return "请输入数字。";
+                        return Loc.T("Dlg.IntervalInvalid");
                     }
 
                     if (n < Config.MinRefreshIntervalSeconds || n > Config.MaxRefreshIntervalSeconds)
                     {
-                        return $"间隔需在 {Config.MinRefreshIntervalSeconds}–{Config.MaxRefreshIntervalSeconds} 秒之间。";
+                        return Loc.T("Dlg.IntervalRange", Config.MinRefreshIntervalSeconds, Config.MaxRefreshIntervalSeconds);
                     }
 
                     return null;

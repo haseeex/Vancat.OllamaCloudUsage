@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.VisualStudio.PlatformUI;
+using Vancat.OllamaCloudUsage.Services;
 
 namespace Vancat.OllamaCloudUsage
 {
@@ -19,6 +20,10 @@ namespace Vancat.OllamaCloudUsage
             PromptText.Text = prompt;
             _validate = validate;
             _isPassword = isPassword;
+
+            // 按钮文本跟随当前语言。
+            OkButton.Content = Loc.T("Dlg.Ok");
+            CancelButton.Content = Loc.T("Dlg.Cancel");
 
             if (isPassword)
             {

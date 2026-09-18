@@ -26,6 +26,7 @@ namespace Vancat.OllamaCloudUsage.Views
             InitializeComponent();
 
             ApplyTheme();
+            ApplyLanguage();
 
             _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _countdownTimer.Tick += (s, e) =>
@@ -39,11 +40,31 @@ namespace Vancat.OllamaCloudUsage.Views
             _countdownTimer.Start();
 
             VSColorTheme.ThemeChanged += OnThemeChanged;
+            Loc.LanguageChanged += OnLanguageChanged;
             Unloaded += (s, e) =>
             {
                 _countdownTimer.Stop();
                 VSColorTheme.ThemeChanged -= OnThemeChanged;
+                Loc.LanguageChanged -= OnLanguageChanged;
             };
+        }
+
+        /// <summary>语言切换时刷新界面文本。</summary>
+        private void OnLanguageChanged(object sender, EventArgs e)
+        {
+            ApplyLanguage();
+            Render(_data);
+
+            if (HoverPopup.IsOpen)
+            {
+                BuildHoverContent();
+            }
+        }
+
+        /// <summary>应用当前语言到静态文本。</summary>
+        private void ApplyLanguage()
+        {
+            OpenButton.ToolTip = Loc.T("StatusBar.Tooltip");
         }
 
         /// <summary>由主包调用以刷新显示数据。</summary>
@@ -53,13 +74,15 @@ namespace Vancat.OllamaCloudUsage.Views
 
             if (data?.Usage == null)
             {
-                UsageText.Text = data?.Loading == true ? "Ollama …" : "Ollama —";
+                UsageText.Text = data?.Loading == true
+                    ? Loc.T("StatusBar.Loading")
+                    : Loc.T("StatusBar.NoData");
             }
             else
             {
                 var sessionPct = (int)Math.Round(data.Usage.Session.Usage * 100);
                 var weeklyPct = (int)Math.Round(data.Usage.Weekly.Usage * 100);
-                UsageText.Text = $"Ollama  5时: {sessionPct}%  周: {weeklyPct}%";
+                UsageText.Text = Loc.T("StatusBar.Text", sessionPct, weeklyPct);
             }
 
             if (HoverPopup.IsOpen)
@@ -149,7 +172,7 @@ namespace Vancat.OllamaCloudUsage.Views
             {
                 HoverContent.Children.Add(new TextBlock
                 {
-                    Text = data?.Error ?? "暂无用量数据。",
+                    Text = data?.Error ?? Loc.T("Hover.NoData"),
                     FontSize = 11,
                     TextWrapping = TextWrapping.Wrap,
                     MaxWidth = 260,
@@ -163,23 +186,24 @@ namespace Vancat.OllamaCloudUsage.Views
             // 标题
             HoverContent.Children.Add(new TextBlock
             {
-                Text = "☁ Ollama Cloud 用量",
+                Text = Loc.T("Hover.Title"),
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 0, 8),
             });
 
-            AddLimitSection("5 小时窗口", usage.Session, ResetTime.NextSessionReset, isFirst: true);
-            AddLimitSection("每周窗口", usage.Weekly, ResetTime.NextWeeklyReset, isFirst: false);
+            AddLimitSection(Loc.T("Hover.SessionWindow"), usage.Session, ResetTime.NextSessionReset, isFirst: true);
+            AddLimitSection(Loc.T("Hover.WeeklyWindow"), usage.Weekly, ResetTime.NextWeeklyReset, isFirst: false);
 
             // 底部信息
+            var refreshPart = Loc.T("Hover.Refresh", Config.FormatInterval(data.IntervalSeconds));
             var footer = data.LastUpdatedMs > 0
-                ? $"每 {Config.FormatInterval(data.IntervalSeconds)}自动刷新 · 上次 {DateTimeOffset.FromUnixTimeMilliseconds(data.LastUpdatedMs).ToLocalTime():HH:mm:ss}"
-                : $"每 {Config.FormatInterval(data.IntervalSeconds)}自动刷新";
+                ? refreshPart + Loc.T("Hover.LastUpdated", DateTimeOffset.FromUnixTimeMilliseconds(data.LastUpdatedMs).ToLocalTime().ToString("HH:mm:ss"))
+                : refreshPart;
 
             HoverContent.Children.Add(new TextBlock
             {
-                Text = footer + "\n点击打开详细面板",
+                Text = footer + Loc.T("Hover.ClickToOpen"),
                 FontSize = 10,
                 Margin = new Thickness(0, 8, 0, 0),
                 Foreground = UsageBarRenderer.MutedBrush,
@@ -260,7 +284,7 @@ namespace Vancat.OllamaCloudUsage.Views
         private static void UpdateCountdownText(TextBlock target, Func<DateTimeOffset, DateTimeOffset> nextReset)
         {
             var now = DateTimeOffset.UtcNow;
-            target.Text = "重置倒计时：" + ResetTime.FormatRemaining(nextReset(now) - now);
+            target.Text = Loc.T("Hover.ResetIn") + ResetTime.FormatRemaining(nextReset(now) - now);
         }
 
         // ---- 点击交互 ----

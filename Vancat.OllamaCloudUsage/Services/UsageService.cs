@@ -99,7 +99,7 @@ namespace Vancat.OllamaCloudUsage.Services
                     lock (_sync)
                     {
                         Usage = null;
-                        Error = "尚未配置 Ollama API 密钥，请先添加账户。";
+                        Error = Loc.T("Err.NoApiKey");
                         Loading = false;
                     }
 
@@ -165,7 +165,7 @@ namespace Vancat.OllamaCloudUsage.Services
                     lock (_sync)
                     {
                         Loading = false;
-                        Error = "刷新失败：" + ex.Message;
+                        Error = Loc.T("Err.RefreshFailed", ex.Message);
                     }
                 }
 

@@ -34,7 +34,7 @@ namespace Vancat.OllamaCloudUsage.Services
             return DateTimeOffset.FromUnixTimeMilliseconds(nextMs);
         }
 
-        /// <summary>将剩余时间格式化为「X 天 / X 小时 Y 分钟 / X 分钟 / X 秒」。</summary>
+        /// <summary>将剩余时间格式化（跟随当前界面语言）。</summary>
         public static string FormatRemaining(TimeSpan remaining)
         {
             if (remaining < TimeSpan.Zero)
@@ -44,22 +44,24 @@ namespace Vancat.OllamaCloudUsage.Services
 
             if (remaining.TotalDays >= 1)
             {
-                return $"{(int)remaining.TotalDays} 天";
+                return Loc.T("Time.Days", (int)remaining.TotalDays);
             }
 
             if (remaining.TotalHours >= 1)
             {
                 var hours = (int)remaining.TotalHours;
                 var minutes = remaining.Minutes;
-                return minutes > 0 ? $"{hours} 小时 {minutes} 分钟" : $"{hours} 小时";
+                return minutes > 0
+                    ? Loc.T("Time.HoursMinutes", hours, minutes)
+                    : Loc.T("Time.Hours", hours);
             }
 
             if (remaining.TotalMinutes >= 1)
             {
-                return $"{(int)remaining.TotalMinutes} 分钟";
+                return Loc.T("Time.Minutes", (int)remaining.TotalMinutes);
             }
 
-            return $"{(int)Math.Max(0, remaining.TotalSeconds)} 秒";
+            return Loc.T("Time.Seconds", (int)Math.Max(0, remaining.TotalSeconds));
         }
     }
 }

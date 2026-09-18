@@ -102,7 +102,7 @@ namespace Vancat.OllamaCloudUsage.Services
         {
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                throw new UsageApiException("Ollama API 密钥为空。");
+                throw new UsageApiException(Loc.T("Err.EmptyKey"));
             }
 
             using (var request = new HttpRequestMessage(HttpMethod.Get, UsageUrl))
@@ -116,24 +116,24 @@ namespace Vancat.OllamaCloudUsage.Services
                 }
                 catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
-                    throw new UsageApiException("Ollama 请求超时。");
+                    throw new UsageApiException(Loc.T("Err.Timeout"));
                 }
                 catch (HttpRequestException ex)
                 {
-                    throw new UsageApiException("无法连接 Ollama Cloud：" + ex.Message, ex);
+                    throw new UsageApiException(Loc.T("Err.CannotConnect", ex.Message), ex);
                 }
 
                 using (response)
                 {
                     if (!response.IsSuccessStatusCode)
                     {
-                        throw new UsageApiException($"Ollama 返回 HTTP {(int)response.StatusCode}。");
+                        throw new UsageApiException(Loc.T("Err.HttpStatus", (int)response.StatusCode));
                     }
 
                     var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     if (body.Length > MaxResponseBytes)
                     {
-                        throw new UsageApiException("Ollama 响应过大。");
+                        throw new UsageApiException(Loc.T("Err.ResponseTooLarge"));
                     }
 
                     try
@@ -142,7 +142,7 @@ namespace Vancat.OllamaCloudUsage.Services
                     }
                     catch (Exception ex)
                     {
-                        throw new UsageApiException("Ollama 响应无效。", ex);
+                        throw new UsageApiException(Loc.T("Err.InvalidResponse"), ex);
                     }
                 }
             }
@@ -180,7 +180,7 @@ namespace Vancat.OllamaCloudUsage.Services
                 return obj;
             }
 
-            throw new UsageApiException($"Ollama 响应中的 {displayName} 无效。");
+            throw new UsageApiException(Loc.T("Err.InvalidField", displayName));
         }
 
         private static string RequireString(JObject parent, string key, string name)
@@ -191,14 +191,14 @@ namespace Vancat.OllamaCloudUsage.Services
                 return token.Value<string>();
             }
 
-            throw new UsageApiException($"Ollama 响应中的 {name} 无效。");
+            throw new UsageApiException(Loc.T("Err.InvalidField", name));
         }
 
         private static List<ModelUsage> ParseModels(JToken token, string name)
         {
             if (!(token is JArray array))
             {
-                throw new UsageApiException($"Ollama 响应中的 {name} 无效。");
+                throw new UsageApiException(Loc.T("Err.InvalidField", name));
             }
 
             var result = new List<ModelUsage>();
@@ -206,7 +206,7 @@ namespace Vancat.OllamaCloudUsage.Services
             {
                 if (!(array[i] is JObject item))
                 {
-                    throw new UsageApiException($"Ollama 响应中的 {name}[{i}] 无效。");
+                    throw new UsageApiException(Loc.T("Err.InvalidField", $"{name}[{i}]"));
                 }
 
                 var modelName = item["name"];
@@ -214,7 +214,7 @@ namespace Vancat.OllamaCloudUsage.Services
                 if (modelName == null || modelName.Type != JTokenType.String ||
                     count == null || (count.Type != JTokenType.Integer && count.Type != JTokenType.Float))
                 {
-                    throw new UsageApiException($"Ollama 响应中的 {name}[{i}] 无效。");
+                    throw new UsageApiException(Loc.T("Err.InvalidField", $"{name}[{i}]"));
                 }
 
                 result.Add(new ModelUsage
@@ -231,13 +231,13 @@ namespace Vancat.OllamaCloudUsage.Services
         {
             if (!(token is JObject obj))
             {
-                throw new UsageApiException($"Ollama 响应中的 {name} 无效。");
+                throw new UsageApiException(Loc.T("Err.InvalidField", name));
             }
 
             var usage = obj["usage"];
             if (usage == null || (usage.Type != JTokenType.Integer && usage.Type != JTokenType.Float))
             {
-                throw new UsageApiException($"Ollama 响应中的 {name}.usage 无效。");
+                throw new UsageApiException(Loc.T("Err.InvalidField", $"{name}.usage"));
             }
 
             return new LimitUsage

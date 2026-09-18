@@ -19,9 +19,41 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
         {
             InitializeComponent();
 
+            ApplyLanguage();
+
             _countdownTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _countdownTimer.Tick += (s, e) => UpdateCountdowns();
             _countdownTimer.Start();
+
+            Loc.LanguageChanged += OnLanguageChanged;
+            Unloaded += (s, e) =>
+            {
+                _countdownTimer.Stop();
+                Loc.LanguageChanged -= OnLanguageChanged;
+            };
+        }
+
+        /// <summary>语言切换时刷新全部界面文本。</summary>
+        private void OnLanguageChanged(object sender, EventArgs e)
+        {
+            ApplyLanguage();
+            Render(_data);
+        }
+
+        /// <summary>应用当前语言到静态文本与工具提示。</summary>
+        private void ApplyLanguage()
+        {
+            TitleText.Text = Loc.T("Panel.Title");
+            RefreshButton.ToolTip = Loc.T("Panel.Refresh");
+            SettingsButton.ToolTip = Loc.T("Panel.Settings");
+            RemoveAccountButton.ToolTip = Loc.T("Panel.RemoveAccount");
+            AddAccountButton.ToolTip = Loc.T("Panel.AddAccount");
+            AddKeyButton.Content = Loc.T("Panel.AddKey");
+            SessionTitle.Text = Loc.T("Panel.SessionWindow");
+            WeeklyTitle.Text = Loc.T("Panel.WeeklyWindow");
+            SessionModelsLabel.Text = Loc.T("Panel.SessionModels");
+            WeeklyModelsLabel.Text = Loc.T("Panel.WeeklyModels");
+            ActivityLabel.Text = Loc.T("Panel.Activity");
         }
 
         /// <summary>由工具窗口调用以渲染最新数据。</summary>
@@ -33,7 +65,7 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
             if (data.Loading)
             {
-                SetStatus("正在加载 Ollama 用量…", false);
+                SetStatus(Loc.T("Panel.Loading"), false);
                 SessionPanel.Visibility = Visibility.Collapsed;
                 WeeklyPanel.Visibility = Visibility.Collapsed;
                 MiddleSeparator.Visibility = Visibility.Collapsed;
@@ -53,7 +85,7 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             }
             else if (data.Usage == null)
             {
-                SetStatus("暂无数据。", false);
+                SetStatus(Loc.T("Panel.NoData"), false);
                 SessionPanel.Visibility = Visibility.Collapsed;
                 WeeklyPanel.Visibility = Visibility.Collapsed;
                 MiddleSeparator.Visibility = Visibility.Collapsed;
@@ -73,7 +105,9 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
                 RenderLimit(usage.Session, SessionBar, SessionPercent, SessionModels);
                 RenderLimit(usage.Weekly, WeeklyBar, WeeklyPercent, WeeklyModels);
 
-                ActivityText.Text = $"费用：${usage.Activity?.Cost ?? "—"}　·　周期：{usage.Activity?.Period?.Type ?? "—"}";
+                var cost = Loc.T("Panel.Cost", usage.Activity?.Cost ?? "—");
+                var period = Loc.T("Panel.Period", usage.Activity?.Period?.Type ?? "—");
+                ActivityText.Text = cost + "　·　" + period;
                 UpdateCountdowns();
             }
 
@@ -112,7 +146,7 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
         private void RenderLimit(LimitUsage limit, Grid barHost, TextBlock percentText, StackPanel modelHost)
         {
-            percentText.Text = $"已用 {Math.Round(limit.Usage * 100)}%";
+            percentText.Text = Loc.T("Panel.Used", Math.Round(limit.Usage * 100));
 
             // 用量条与模型列表复用共享渲染器，保证与状态栏浮窗显示一致。
             UsageBarRenderer.RenderBar(barHost, limit);
@@ -127,8 +161,8 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             }
 
             var now = DateTimeOffset.UtcNow;
-            SessionReset.Text = "重置倒计时：" + ResetTime.FormatRemaining(ResetTime.NextSessionReset(now) - now);
-            WeeklyReset.Text = "重置倒计时：" + ResetTime.FormatRemaining(ResetTime.NextWeeklyReset(now) - now);
+            SessionReset.Text = Loc.T("Panel.ResetIn") + ResetTime.FormatRemaining(ResetTime.NextSessionReset(now) - now);
+            WeeklyReset.Text = Loc.T("Panel.ResetIn") + ResetTime.FormatRemaining(ResetTime.NextWeeklyReset(now) - now);
         }
 
         private void SetStatus(string text, bool isError)
@@ -140,11 +174,11 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
         private void RenderFooter(UsageUpdatedEventArgs data)
         {
-            var parts = new List<string> { $"每 {Config.FormatInterval(data.IntervalSeconds)}自动刷新" };
+            var parts = new List<string> { Loc.T("Panel.AutoRefresh", Config.FormatInterval(data.IntervalSeconds)) };
             if (data.LastUpdatedMs > 0)
             {
                 var local = DateTimeOffset.FromUnixTimeMilliseconds(data.LastUpdatedMs).ToLocalTime();
-                parts.Add($"上次更新 {local:HH:mm:ss}");
+                parts.Add(Loc.T("Panel.LastUpdated", local.ToString("HH:mm:ss")));
             }
 
             FooterText.Text = string.Join("　·　", parts);

@@ -53,6 +53,12 @@
           <ButtonText>设置自动刷新间隔</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidToggleLanguage" priority="0x0600" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" />
+        <Strings>
+          <ButtonText>切换语言 (中/EN)</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
 
@@ -64,6 +70,7 @@
       <IDSymbol name="cmdidAddAccount" value="0x0102" />
       <IDSymbol name="cmdidRemoveAccount" value="0x0103" />
       <IDSymbol name="cmdidSetRefreshInterval" value="0x0104" />
+      <IDSymbol name="cmdidToggleLanguage" value="0x0105" />
       <IDSymbol name="OllamaCloudSubMenu" value="0x1000" />
       <IDSymbol name="OllamaCloudMenuGroup" value="0x1001" />
       <IDSymbol name="OllamaCloudOtherWindowsGroup" value="0x1002" />
