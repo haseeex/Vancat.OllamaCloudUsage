@@ -4,6 +4,12 @@
 
 > 设计参考：[ollama-cloud-usage](https://github.com/longnh0411/ollama-cloud-usage)（VS Code 扩展）
 
+## 📷 截图
+
+用量面板（左侧）、状态栏悬停浮窗（右下）与状态栏指示器（底部）：
+
+![概览](docs/screenshots/overview.png)
+
 ## ✨ 功能
 
 - **状态栏用量指示器** — 在 Visual Studio 状态栏实时显示会话（5 小时）与每周窗口的用量百分比：
