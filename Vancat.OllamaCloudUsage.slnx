@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Vancat.OllamaCloudUsage/Vancat.OllamaCloudUsage.csproj">
+    <Deploy />
+  </Project>
+</Solution>

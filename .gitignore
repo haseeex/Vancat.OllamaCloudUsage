@@ -1,0 +1,26 @@
+## Visual Studio / VSIX
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.vsix
+*.vsct.bak
+
+## 构建产物
+[Ll]og/
+[Ll]ogs/
+*.log
+
+## 包缓存
+packages/
+*.nupkg
+
+## ReSharper / Rider
+_ReSharper*/
+*.DotSettings.user
+
+## 系统文件
+Thumbs.db
+desktop.ini
+.DS_Store

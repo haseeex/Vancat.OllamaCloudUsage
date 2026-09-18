@@ -1,0 +1,90 @@
+<UserControl x:Class="Vancat.OllamaCloudUsage.ToolWindows.UsageToolWindowControl"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:platformui="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+        Background="{DynamicResource {x:Static platformui:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+        Foreground="{DynamicResource {x:Static platformui:EnvironmentColors.ToolWindowTextBrushKey}}"
+        MinWidth="300">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <!-- 描述文字色 -->
+            <SolidColorBrush x:Key="DescBrush" Color="#888888" />
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16,14,16,14">
+        <StackPanel>
+
+            <!-- 顶部工具栏 -->
+            <DockPanel Margin="0,0,0,12">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="RefreshButton" Content="⟳" Width="28" Height="26" Margin="0,0,4,0"
+                            ToolTip="刷新" Click="OnRefresh" />
+                    <Button x:Name="SettingsButton" Content="⚙" Width="28" Height="26"
+                            ToolTip="设置自动刷新间隔" Click="OnSettings" />
+                </StackPanel>
+                <TextBlock Text="☁ 云端用量" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
+
+            <!-- 账户选择行 -->
+            <DockPanel Margin="0,0,0,16">
+                <Button x:Name="RemoveAccountButton" DockPanel.Dock="Right" Content="－" Width="28" Height="26"
+                        Margin="4,0,0,0" ToolTip="移除账户" Click="OnRemoveAccount" />
+                <Button x:Name="AddAccountButton" DockPanel.Dock="Right" Content="＋" Width="28" Height="26"
+                        Margin="4,0,0,0" ToolTip="添加账户" Click="OnAddAccount" />
+                <ComboBox x:Name="AccountCombo" Height="26" SelectionChanged="OnAccountChanged" />
+            </DockPanel>
+
+            <!-- 状态提示 -->
+            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,0,0,10"
+                       Foreground="{StaticResource DescBrush}" Visibility="Collapsed" />
+
+            <Button x:Name="AddKeyButton" Content="添加 API 密钥" Padding="12,6" Margin="0,4,0,0"
+                    HorizontalAlignment="Center" Visibility="Collapsed" Click="OnAddAccount" />
+
+            <!-- 5 小时窗口 -->
+            <StackPanel x:Name="SessionPanel" Visibility="Collapsed">
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock DockPanel.Dock="Right" x:Name="SessionPercent" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="5 小时窗口用量" FontSize="13" FontWeight="Medium" />
+                </DockPanel>
+                <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
+                    <Grid x:Name="SessionBar" />
+                </Border>
+                <TextBlock x:Name="SessionReset" FontSize="11" Margin="0,5,0,0"
+                           Foreground="{StaticResource DescBrush}" />
+                <TextBlock Text="本窗口使用的模型" FontSize="11" Margin="0,16,0,6"
+                           Foreground="{StaticResource DescBrush}" />
+                <StackPanel x:Name="SessionModels" />
+            </StackPanel>
+
+            <Separator Margin="0,18,0,18" x:Name="MiddleSeparator" Visibility="Collapsed" />
+
+            <!-- 每周窗口 -->
+            <StackPanel x:Name="WeeklyPanel" Visibility="Collapsed">
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock DockPanel.Dock="Right" x:Name="WeeklyPercent" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="每周窗口用量" FontSize="13" FontWeight="Medium" />
+                </DockPanel>
+                <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
+                    <Grid x:Name="WeeklyBar" />
+                </Border>
+                <TextBlock x:Name="WeeklyReset" FontSize="11" Margin="0,5,0,0"
+                           Foreground="{StaticResource DescBrush}" />
+                <TextBlock Text="本周使用的模型" FontSize="11" Margin="0,16,0,6"
+                           Foreground="{StaticResource DescBrush}" />
+                <StackPanel x:Name="WeeklyModels" />
+            </StackPanel>
+
+            <!-- 活动摘要 -->
+            <StackPanel x:Name="ActivityPanel" Visibility="Collapsed" Margin="0,18,0,0">
+                <TextBlock Text="活动" FontSize="11" Foreground="{StaticResource DescBrush}" Margin="0,0,0,6" />
+                <TextBlock x:Name="ActivityText" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- 底部状态 -->
+            <TextBlock x:Name="FooterText" FontSize="11" Margin="0,20,0,0"
+                       HorizontalAlignment="Center" Foreground="{StaticResource DescBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidOllamaCloudUsagePackage">
+    <Menus>
+      <Menu guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudSubMenu" priority="0x0500" type="Menu">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_MM_TOOLSADDINS" />
+        <Strings>
+          <ButtonText>Ollama Cloud 用量</ButtonText>
+        </Strings>
+      </Menu>
+    </Menus>
+
+    <Groups>
+      <Group guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" priority="0x0000">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudSubMenu" />
+      </Group>
+      <Group guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudOtherWindowsGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidRefreshUsage" priority="0x0100" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" />
+        <Strings>
+          <ButtonText>刷新用量</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidOpenUsagePanel" priority="0x0200" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudOtherWindowsGroup" />
+        <Strings>
+          <ButtonText>Ollama Cloud 用量面板</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidAddAccount" priority="0x0300" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" />
+        <Strings>
+          <ButtonText>添加账户</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidRemoveAccount" priority="0x0400" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" />
+        <Strings>
+          <ButtonText>移除账户</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidSetRefreshInterval" priority="0x0500" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" />
+        <Strings>
+          <ButtonText>设置自动刷新间隔</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidOllamaCloudUsagePackage" value="{3E9F1A72-8C4B-4D6E-B2A9-5F7C1D8E3A64}" />
+    <GuidSymbol name="guidOllamaCloudUsageCmdSet" value="{B6D4E8F2-1A3C-4E5F-9B7D-2C8A6F4E1B93}">
+      <IDSymbol name="cmdidRefreshUsage" value="0x0100" />
+      <IDSymbol name="cmdidOpenUsagePanel" value="0x0101" />
+      <IDSymbol name="cmdidAddAccount" value="0x0102" />
+      <IDSymbol name="cmdidRemoveAccount" value="0x0103" />
+      <IDSymbol name="cmdidSetRefreshInterval" value="0x0104" />
+      <IDSymbol name="OllamaCloudSubMenu" value="0x1000" />
+      <IDSymbol name="OllamaCloudMenuGroup" value="0x1001" />
+      <IDSymbol name="OllamaCloudOtherWindowsGroup" value="0x1002" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>
