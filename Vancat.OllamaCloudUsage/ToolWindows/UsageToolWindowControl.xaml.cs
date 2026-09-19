@@ -26,11 +26,19 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             _countdownTimer.Start();
 
             Loc.LanguageChanged += OnLanguageChanged;
+            Config.DisplayChanged += OnDisplayChanged;
             Unloaded += (s, e) =>
             {
                 _countdownTimer.Stop();
                 Loc.LanguageChanged -= OnLanguageChanged;
+                Config.DisplayChanged -= OnDisplayChanged;
             };
+        }
+
+        /// <summary>用量精度等显示设置变更时按新设置重绘。</summary>
+        private void OnDisplayChanged(object sender, EventArgs e)
+        {
+            Render(_data);
         }
 
         /// <summary>语言切换时刷新全部界面文本。</summary>
@@ -146,7 +154,20 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
         private void RenderLimit(LimitUsage limit, Grid barHost, TextBlock percentText, StackPanel modelHost)
         {
-            percentText.Text = Loc.T("Panel.Used", Math.Round(limit.Usage * 100));
+            // 百分比 + 窗口级剩余次数预测（总请求数 / usage − 总请求数）。
+            var text = Loc.T("Panel.Used", Config.FormatUsagePercent(limit.Usage));
+            var estimate = QuotaPredictor.EstimateRemainingRequests(limit);
+            if (estimate.HasValue)
+            {
+                text += "　·　" + Loc.T("Panel.Remaining", QuotaPredictor.Format(estimate.Value));
+                percentText.ToolTip = Loc.T("Panel.RemainingTip", QuotaPredictor.Format(estimate.Value));
+            }
+            else
+            {
+                percentText.ToolTip = null;
+            }
+
+            percentText.Text = text;
 
             // 用量条与模型列表复用共享渲染器，保证与状态栏浮窗显示一致。
             UsageBarRenderer.RenderBar(barHost, limit);

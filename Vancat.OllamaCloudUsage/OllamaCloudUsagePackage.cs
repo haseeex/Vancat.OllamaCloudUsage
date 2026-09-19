@@ -14,7 +14,7 @@ namespace Vancat.OllamaCloudUsage
 {
     /// <summary>Ollama Cloud 用量监控扩展主包。</summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [InstalledProductRegistration("Ollama Cloud 用量监控", "在 Visual Studio 中查看 Ollama Cloud 用量与限额。", "1.2.2")]
+    [InstalledProductRegistration("Ollama Cloud 用量监控", "在 Visual Studio 中查看 Ollama Cloud 用量与限额。", "1.3.3")]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [ProvideToolWindow(typeof(UsageToolWindow), Style = VsDockStyle.Tabbed, Window = ToolWindowGuids.SolutionExplorer)]
     [ProvideAutoLoad(VSConstants.UICONTEXT.ShellInitialized_string, PackageAutoLoadFlags.BackgroundLoad)]
@@ -139,6 +139,9 @@ namespace Vancat.OllamaCloudUsage
             var toggleLangCmd = new OleMenuCommand(
                 (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = ToggleLanguageAsync(); },
                 new CommandID(cmdSet, 0x0105));
+            var setPrecisionCmd = new OleMenuCommand(
+                (s, e) => { ThreadHelper.ThrowIfNotOnUIThread(); _ = SetUsagePrecisionAsync(); },
+                new CommandID(cmdSet, 0x0106));
 
             commandService.AddCommand(refreshCmd);
             commandService.AddCommand(openPanelCmd);
@@ -146,6 +149,7 @@ namespace Vancat.OllamaCloudUsage
             commandService.AddCommand(removeAccountCmd);
             commandService.AddCommand(setIntervalCmd);
             commandService.AddCommand(toggleLangCmd);
+            commandService.AddCommand(setPrecisionCmd);
 
             // 菜单文本跟随语言切换（VSCT 里的初始文本为中文）。
             _menuCommands = new (OleMenuCommand Command, string Key)[]
@@ -156,6 +160,7 @@ namespace Vancat.OllamaCloudUsage
                 (removeAccountCmd, "Cmd.RemoveAccount"),
                 (setIntervalCmd, "Cmd.SetInterval"),
                 (toggleLangCmd, "Cmd.ToggleLang"),
+                (setPrecisionCmd, "Cmd.SetPrecision"),
             };
             ApplyMenuLanguage();
 
@@ -284,6 +289,24 @@ namespace Vancat.OllamaCloudUsage
             await UsageService.RefreshAsync(true).ConfigureAwait(false);
         }
 
+        /// <summary>设置用量百分比的显示精度（小数位数）。</summary>
+        internal async Task SetUsagePrecisionAsync()
+        {
+            await JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var precision = PromptForUsagePrecision();
+            if (precision == null)
+            {
+                return;
+            }
+
+            Config.SetUsagePrecision(precision.Value);
+
+            // 通知界面按新精度重新渲染（无需重新请求 API）。
+            Config.RaiseDisplayChanged();
+            _statusBar?.Update(UsageService.Snapshot());
+        }
+
         internal void SwitchAccount(string id)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -343,6 +366,37 @@ namespace Vancat.OllamaCloudUsage
                     if (n < Config.MinRefreshIntervalSeconds || n > Config.MaxRefreshIntervalSeconds)
                     {
                         return Loc.T("Dlg.IntervalRange", Config.MinRefreshIntervalSeconds, Config.MaxRefreshIntervalSeconds);
+                    }
+
+                    return null;
+                });
+            if (dialog.ShowDialog() != true)
+            {
+                return null;
+            }
+
+            return int.Parse(dialog.Value.Trim());
+        }
+
+        /// <summary>弹出对话框让用户输入用量百分比的小数位数。</summary>
+        private int? PromptForUsagePrecision()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            var current = Config.GetUsagePrecision();
+            var dialog = new InputDialog(
+                Loc.T("Dlg.PrecisionTitle"),
+                Loc.T("Dlg.PrecisionPrompt", Config.MinUsagePrecision, Config.MaxUsagePrecision),
+                current.ToString(),
+                value =>
+                {
+                    if (!int.TryParse(value?.Trim(), out var n))
+                    {
+                        return Loc.T("Dlg.PrecisionInvalid");
+                    }
+
+                    if (n < Config.MinUsagePrecision || n > Config.MaxUsagePrecision)
+                    {
+                        return Loc.T("Dlg.PrecisionRange", Config.MinUsagePrecision, Config.MaxUsagePrecision);
                     }
 
                     return null;

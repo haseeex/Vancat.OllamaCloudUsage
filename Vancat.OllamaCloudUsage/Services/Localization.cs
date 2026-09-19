@@ -91,6 +91,8 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Hover.Title"] = "☁ Ollama Cloud Usage",
             ["Hover.NoData"] = "No usage data.",
             ["Hover.SessionWindow"] = "5-hour window",
+            ["Hover.Remaining"] = "≈{0} left",
+            ["Hover.RemainingTip"] = "Estimated from this window's average consumption: about {0} more requests available before reset",
             ["Hover.WeeklyWindow"] = "Weekly window",
             ["Hover.ResetIn"] = "Resets in: ",
             ["Hover.Refresh"] = "Auto-refresh every {0}",
@@ -109,6 +111,8 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Panel.SessionModels"] = "Models this window",
             ["Panel.WeeklyModels"] = "Models this week",
             ["Panel.Used"] = "Used {0}%",
+            ["Panel.Remaining"] = "≈{0} req. left",
+            ["Panel.RemainingTip"] = "Estimated from this window's average consumption: about {0} more requests available before reset",
             ["Panel.Activity"] = "Activity",
             ["Panel.Cost"] = "Cost: ${0}",
             ["Panel.Period"] = "Period: {0}",
@@ -121,6 +125,11 @@ namespace Vancat.OllamaCloudUsage.Services
             // 模型列表
             ["Models.None"] = "No model requests",
             ["Models.Requests"] = "{0} req.",
+            ["Models.WindowShare"] = "{0}%",
+            ["Models.WindowShareTip"] = "This model accounts for {0}% of the window's quota (window usage {1}% × this model's share of requests)",
+            ["Models.Remaining"] = "· ≈{0} left",
+            ["Models.RemainingTip"] = "If this model were used exclusively: window capacity {0} − requests already made by this model = about {1} more requests left",
+
 
             // 时间
             ["Time.Days"] = "{0} d",
@@ -140,6 +149,7 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Cmd.RemoveAccount"] = "Remove Account",
             ["Cmd.SetInterval"] = "Set Refresh Interval",
             ["Cmd.ToggleLang"] = "Switch Language (中/EN)",
+            ["Cmd.SetPrecision"] = "Set Usage Display Precision",
 
             // 对话框
             ["Dlg.Ok"] = "OK",
@@ -156,6 +166,10 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Dlg.IntervalPrompt"] = "Auto-refresh interval (seconds), range {0}–{1}",
             ["Dlg.IntervalInvalid"] = "Please enter a number.",
             ["Dlg.IntervalRange"] = "Interval must be between {0} and {1} seconds.",
+            ["Dlg.PrecisionTitle"] = "Set Usage Display Precision",
+            ["Dlg.PrecisionPrompt"] = "Decimal places for usage percentage, range {0}–{1} (default 1)",
+            ["Dlg.PrecisionInvalid"] = "Please enter a number.",
+            ["Dlg.PrecisionRange"] = "Precision must be between {0} and {1}.",
 
             // 消息
             ["Msg.CannotCreatePanel"] = "Failed to create usage panel window.",
@@ -163,6 +177,7 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Msg.AccountRemoved"] = "Account removed.",
             ["Msg.IntervalSet"] = "Auto-refresh interval set to {0}.",
             ["Msg.LanguageSet"] = "Language switched to English.",
+            ["Msg.PrecisionSet"] = "Usage display precision set to {0} decimal place(s).",
 
             // 错误
             ["Err.NoApiKey"] = "No Ollama API key configured. Please add an account first.",
@@ -191,6 +206,8 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Hover.Title"] = "☁ Ollama Cloud 用量",
             ["Hover.NoData"] = "暂无用量数据。",
             ["Hover.SessionWindow"] = "5 小时窗口",
+            ["Hover.Remaining"] = "剩余约 {0} 次",
+            ["Hover.RemainingTip"] = "按当前窗口平均消耗估算：重置前还可请求约 {0} 次（总请求数 ÷ 已用比例 − 总请求数）",
             ["Hover.WeeklyWindow"] = "每周窗口",
             ["Hover.ResetIn"] = "重置倒计时：",
             ["Hover.Refresh"] = "每 {0}自动刷新",
@@ -209,6 +226,8 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Panel.SessionModels"] = "本窗口使用的模型",
             ["Panel.WeeklyModels"] = "本周使用的模型",
             ["Panel.Used"] = "已用 {0}%",
+            ["Panel.Remaining"] = "剩余约 {0} 次",
+            ["Panel.RemainingTip"] = "按当前窗口平均消耗估算：重置前还可请求约 {0} 次（总请求数 ÷ 已用比例 − 总请求数）",
             ["Panel.Activity"] = "活动",
             ["Panel.Cost"] = "费用：${0}",
             ["Panel.Period"] = "周期：{0}",
@@ -221,6 +240,10 @@ namespace Vancat.OllamaCloudUsage.Services
             // 模型列表
             ["Models.None"] = "无模型请求",
             ["Models.Requests"] = "{0} 次",
+            ["Models.WindowShare"] = "{0}%",
+            ["Models.WindowShareTip"] = "该模型占用窗口 {0}% 的配额（窗口用量 {1}% × 该模型请求占比）",
+            ["Models.Remaining"] = "· 剩余约 {0} 次",
+            ["Models.RemainingTip"] = "若仅使用该模型：窗口容量 {0} 次 − 该模型已用次数 = 还可请求约 {1} 次",
 
             // 时间
             ["Time.Days"] = "{0} 天",
@@ -240,6 +263,7 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Cmd.RemoveAccount"] = "移除账户",
             ["Cmd.SetInterval"] = "设置自动刷新间隔",
             ["Cmd.ToggleLang"] = "切换语言 (中/EN)",
+            ["Cmd.SetPrecision"] = "设置用量显示精度",
 
             // 对话框
             ["Dlg.Ok"] = "确定",
@@ -256,6 +280,10 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Dlg.IntervalPrompt"] = "自动刷新间隔（秒），范围 {0}–{1}",
             ["Dlg.IntervalInvalid"] = "请输入数字。",
             ["Dlg.IntervalRange"] = "间隔需在 {0}–{1} 秒之间。",
+            ["Dlg.PrecisionTitle"] = "设置用量显示精度",
+            ["Dlg.PrecisionPrompt"] = "用量百分比小数位数，范围 {0}–{1}（默认 1）",
+            ["Dlg.PrecisionInvalid"] = "请输入数字。",
+            ["Dlg.PrecisionRange"] = "精度需在 {0}–{1} 之间。",
 
             // 消息
             ["Msg.CannotCreatePanel"] = "无法创建用量面板窗口。",
@@ -263,6 +291,7 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Msg.AccountRemoved"] = "账户已移除。",
             ["Msg.IntervalSet"] = "自动刷新间隔已设为 {0}。",
             ["Msg.LanguageSet"] = "界面语言已切换为中文。",
+            ["Msg.PrecisionSet"] = "用量显示精度已设为 {0} 位小数。",
 
             // 错误
             ["Err.NoApiKey"] = "尚未配置 Ollama API 密钥，请先添加账户。",

@@ -59,6 +59,12 @@
           <ButtonText>切换语言 (中/EN)</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidOllamaCloudUsageCmdSet" id="cmdidSetUsagePrecision" priority="0x0700" type="Button">
+        <Parent guid="guidOllamaCloudUsageCmdSet" id="OllamaCloudMenuGroup" />
+        <Strings>
+          <ButtonText>设置用量显示精度</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
 
@@ -71,6 +77,7 @@
       <IDSymbol name="cmdidRemoveAccount" value="0x0103" />
       <IDSymbol name="cmdidSetRefreshInterval" value="0x0104" />
       <IDSymbol name="cmdidToggleLanguage" value="0x0105" />
+      <IDSymbol name="cmdidSetUsagePrecision" value="0x0106" />
       <IDSymbol name="OllamaCloudSubMenu" value="0x1000" />
       <IDSymbol name="OllamaCloudMenuGroup" value="0x1001" />
       <IDSymbol name="OllamaCloudOtherWindowsGroup" value="0x1002" />

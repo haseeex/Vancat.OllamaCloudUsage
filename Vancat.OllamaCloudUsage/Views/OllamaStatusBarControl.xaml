@@ -41,8 +41,8 @@
             <Border x:Name="HoverBorder" CornerRadius="4" Padding="10,8"
                     BorderThickness="1" Margin="6" MaxHeight="520"
                     Background="#FF2D2D30" BorderBrush="#FF3F3F46">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="HoverContent" MinWidth="220" />
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="HoverContent" MinWidth="260" MaxWidth="380" />
                 </ScrollViewer>
             </Border>
         </Popup>

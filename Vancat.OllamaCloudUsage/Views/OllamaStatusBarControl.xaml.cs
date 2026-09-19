@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -41,12 +42,24 @@ namespace Vancat.OllamaCloudUsage.Views
 
             VSColorTheme.ThemeChanged += OnThemeChanged;
             Loc.LanguageChanged += OnLanguageChanged;
+            Config.DisplayChanged += OnDisplayChanged;
             Unloaded += (s, e) =>
             {
                 _countdownTimer.Stop();
                 VSColorTheme.ThemeChanged -= OnThemeChanged;
                 Loc.LanguageChanged -= OnLanguageChanged;
+                Config.DisplayChanged -= OnDisplayChanged;
             };
+        }
+
+        /// <summary>用量精度等显示设置变更时按新设置重绘。</summary>
+        private void OnDisplayChanged(object sender, EventArgs e)
+        {
+            Render(_data);
+            if (HoverPopup.IsOpen)
+            {
+                BuildHoverContent();
+            }
         }
 
         /// <summary>语言切换时刷新界面文本。</summary>
@@ -80,8 +93,8 @@ namespace Vancat.OllamaCloudUsage.Views
             }
             else
             {
-                var sessionPct = (int)Math.Round(data.Usage.Session.Usage * 100);
-                var weeklyPct = (int)Math.Round(data.Usage.Weekly.Usage * 100);
+                var sessionPct = Config.FormatUsagePercent(data.Usage.Session.Usage);
+                var weeklyPct = Config.FormatUsagePercent(data.Usage.Weekly.Usage);
                 UsageText.Text = Loc.T("StatusBar.Text", sessionPct, weeklyPct);
             }
 
@@ -224,14 +237,23 @@ namespace Vancat.OllamaCloudUsage.Views
                 });
             }
 
-            // 标题行：名称 + 百分比
+            // 标题行：名称 + 百分比（+ 剩余次数预测）
             var head = new DockPanel { Margin = new Thickness(0, 0, 0, 5) };
+            var estimate = QuotaPredictor.EstimateRemainingRequests(limit);
+            var usageText = Config.FormatUsagePercent(limit.Usage) + "%";
             var pct = new TextBlock
             {
-                Text = $"{Math.Round(limit.Usage * 100)}%",
+                Text = estimate.HasValue
+                    ? usageText + "　·　" + Loc.T("Hover.Remaining", QuotaPredictor.Format(estimate.Value))
+                    : usageText,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
             };
+            if (estimate.HasValue)
+            {
+                pct.ToolTip = Loc.T("Hover.RemainingTip", QuotaPredictor.Format(estimate.Value));
+            }
+
             DockPanel.SetDock(pct, Dock.Right);
             head.Children.Add(pct);
             head.Children.Add(new TextBlock { Text = title, FontSize = 11 });

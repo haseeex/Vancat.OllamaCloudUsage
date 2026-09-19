@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="Vancat.OllamaCloudUsage" Version="1.2.2" Language="zh-CN" Publisher="vancat" />
+    <Identity Id="Vancat.OllamaCloudUsage" Version="1.3.3" Language="zh-CN" Publisher="vancat" />
     <DisplayName>Ollama Cloud 用量监控</DisplayName>
     <Description xml:space="preserve">在 Visual Studio 中查看 Ollama Cloud 用量与限额。
 
 功能：
 - 状态栏实时显示 5 小时窗口与每周窗口用量百分比
-- 鼠标悬停状态栏可展开详细浮窗（用量条 + 模型统计 + 重置倒计时）
+- 鼠标悬停状态栏可展开详细浮窗（用量条 + 模型统计 + 剩余次数预测 + 重置倒计时）
+- 按当前窗口平均消耗估算重置前还可请求的次数
 - 点击状态栏或按钮一键打开用量面板工具窗口
 - 多账户管理（API 密钥经 Windows DPAPI 加密存储）
 - 可配置自动刷新间隔，多个 Visual Studio 实例共享用量缓存</Description>
