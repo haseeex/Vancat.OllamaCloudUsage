@@ -6,12 +6,32 @@ using Newtonsoft.Json.Linq;
 
 namespace Vancat.OllamaCloudUsage.Services
 {
-    /// <summary>缓存快照。</summary>
+    /// <summary>
+    /// 缓存快照（v2）：一次刷新包含小时用量、每日用量与余额三份原始 JSON。
+    ///
+    /// 版本号在存储格式变化时递增，旧格式缓存会被自动忽略并重新获取。
+    /// </summary>
     public sealed class CacheSnapshot
     {
-        public JObject Usage { get; set; }
+        /// <summary>存储格式版本。v2 = 适配 2026-10-06 新 API。</summary>
+        public int Version { get; set; } = CacheVersion;
+
+        /// <summary>按小时分桶的用量原始 JSON。</summary>
+        public JObject Hourly { get; set; }
+
+        /// <summary>按天分桶的用量原始 JSON。</summary>
+        public JObject Daily { get; set; }
+
+        /// <summary>余额原始 JSON。</summary>
+        public JObject Balance { get; set; }
+
+        /// <summary>写入时刻（epoch 毫秒）。</summary>
         public long FetchedAtMs { get; set; }
+
+        /// <summary>账户 id。</summary>
         public string AccountId { get; set; }
+
+        public const int CacheVersion = 2;
     }
 
     /// <summary>
@@ -52,7 +72,15 @@ namespace Vancat.OllamaCloudUsage.Services
                     {
                         jsonReader.DateParseHandling = DateParseHandling.None;
                         var serializer = JsonSerializer.CreateDefault();
-                        return serializer.Deserialize<CacheSnapshot>(jsonReader);
+                        var snapshot = serializer.Deserialize<CacheSnapshot>(jsonReader);
+
+                        // 旧格式缓存直接忽略。
+                        if (snapshot == null || snapshot.Version != CacheSnapshot.CacheVersion)
+                        {
+                            return null;
+                        }
+
+                        return snapshot;
                     }
                 }
                 catch
@@ -62,7 +90,7 @@ namespace Vancat.OllamaCloudUsage.Services
             }
         }
 
-        public void Write(JObject usage, string accountId)
+        public void Write(JObject hourly, JObject daily, JObject balance, string accountId)
         {
             lock (_sync)
             {
@@ -76,11 +104,24 @@ namespace Vancat.OllamaCloudUsage.Services
 
                     var snapshot = new CacheSnapshot
                     {
-                        Usage = usage,
+                        Hourly = hourly,
+                        Daily = daily,
+                        Balance = balance,
                         FetchedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                         AccountId = accountId,
                     };
-                    File.WriteAllText(_filePath, JsonConvert.SerializeObject(snapshot), Encoding.UTF8);
+
+                    // 先写临时文件再原子替换，避免多实例同时写导致文件损坏。
+                    var payload = JsonConvert.SerializeObject(snapshot);
+                    var tmp = _filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    File.WriteAllText(tmp, payload, Encoding.UTF8);
+
+                    if (File.Exists(_filePath))
+                    {
+                        File.Delete(_filePath);
+                    }
+
+                    File.Move(tmp, _filePath);
                 }
                 catch
                 {
@@ -92,7 +133,7 @@ namespace Vancat.OllamaCloudUsage.Services
         /// <summary>判断缓存是否仍然新鲜（未超过刷新间隔）。</summary>
         public static bool IsFresh(CacheSnapshot snapshot, TimeSpan maxAge, string accountId)
         {
-            if (snapshot?.Usage == null)
+            if (snapshot?.Hourly == null || snapshot.Daily == null || snapshot.Balance == null)
             {
                 return false;
             }

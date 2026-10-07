@@ -1,14 +1,19 @@
 using System;
-using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Vancat.OllamaCloudUsage.Services;
 using Vancat.OllamaCloudUsage.Views;
 
 namespace Vancat.OllamaCloudUsage.ToolWindows
 {
-    /// <summary>用量面板控件：渲染用量条、模型列表与重置倒计时。</summary>
+    /// <summary>
+    /// 用量面板控件：渲染用量条、请求历史图表与重置倒计时。
+    ///
+    /// 已适配官方 2026-10-06 新 API：数据来自 /api/balance（权威百分比与
+    /// 重置时间）+ /api/usage（请求历史），支持旧版窗口计划与信用计划两种形态。
+    /// </summary>
     public partial class UsageToolWindowControl : UserControl
     {
         private readonly DispatcherTimer _countdownTimer;
@@ -35,33 +40,28 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             };
         }
 
-        /// <summary>用量精度等显示设置变更时按新设置重绘。</summary>
-        private void OnDisplayChanged(object sender, EventArgs e)
-        {
-            Render(_data);
-        }
-
-        /// <summary>语言切换时刷新全部界面文本。</summary>
         private void OnLanguageChanged(object sender, EventArgs e)
         {
             ApplyLanguage();
             Render(_data);
         }
 
-        /// <summary>应用当前语言到静态文本与工具提示。</summary>
+        private void OnDisplayChanged(object sender, EventArgs e) => Render(_data);
+
+        /// <summary>应用当前语言到静态文本与按钮提示。</summary>
         private void ApplyLanguage()
         {
             TitleText.Text = Loc.T("Panel.Title");
             RefreshButton.ToolTip = Loc.T("Panel.Refresh");
             SettingsButton.ToolTip = Loc.T("Panel.Settings");
-            RemoveAccountButton.ToolTip = Loc.T("Panel.RemoveAccount");
             AddAccountButton.ToolTip = Loc.T("Panel.AddAccount");
+            RemoveAccountButton.ToolTip = Loc.T("Panel.RemoveAccount");
             AddKeyButton.Content = Loc.T("Panel.AddKey");
             SessionTitle.Text = Loc.T("Panel.SessionWindow");
             WeeklyTitle.Text = Loc.T("Panel.WeeklyWindow");
-            SessionModelsLabel.Text = Loc.T("Panel.SessionModels");
-            WeeklyModelsLabel.Text = Loc.T("Panel.WeeklyModels");
-            ActivityLabel.Text = Loc.T("Panel.Activity");
+            CreditsTitle.Text = Loc.T("Panel.IncludedCredits");
+            Chart24hTitle.Text = Loc.T("Usage.24h");
+            Chart7dTitle.Text = Loc.T("Usage.7d");
         }
 
         /// <summary>由工具窗口调用以渲染最新数据。</summary>
@@ -71,55 +71,82 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
             RenderAccounts(data);
 
-            if (data.Loading)
+            var usage = data?.Usage;
+            if (data == null || usage?.Balance == null)
             {
-                SetStatus(Loc.T("Panel.Loading"), false);
-                SessionPanel.Visibility = Visibility.Collapsed;
-                WeeklyPanel.Visibility = Visibility.Collapsed;
-                MiddleSeparator.Visibility = Visibility.Collapsed;
-                ActivityPanel.Visibility = Visibility.Collapsed;
-                AddKeyButton.Visibility = Visibility.Collapsed;
-            }
-            else if (data.Error != null)
-            {
-                SetStatus("⚠ " + data.Error, true);
-                SessionPanel.Visibility = Visibility.Collapsed;
-                WeeklyPanel.Visibility = Visibility.Collapsed;
-                MiddleSeparator.Visibility = Visibility.Collapsed;
-                ActivityPanel.Visibility = Visibility.Collapsed;
-                AddKeyButton.Visibility = string.IsNullOrWhiteSpace(data.Accounts.Active?.Key)
+                SetStatus(data?.Loading == true ? Loc.T("Panel.Loading") : (data?.Error ?? Loc.T("Panel.NoData")), data?.Error != null);
+                HideAllSections();
+                AddKeyButton.Visibility = data?.Error != null && string.IsNullOrWhiteSpace(data.Accounts.Active?.Key)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-            }
-            else if (data.Usage == null)
-            {
-                SetStatus(Loc.T("Panel.NoData"), false);
-                SessionPanel.Visibility = Visibility.Collapsed;
-                WeeklyPanel.Visibility = Visibility.Collapsed;
-                MiddleSeparator.Visibility = Visibility.Collapsed;
-                ActivityPanel.Visibility = Visibility.Collapsed;
-                AddKeyButton.Visibility = Visibility.Collapsed;
             }
             else
             {
                 StatusText.Visibility = Visibility.Collapsed;
                 AddKeyButton.Visibility = Visibility.Collapsed;
-                SessionPanel.Visibility = Visibility.Visible;
-                WeeklyPanel.Visibility = Visibility.Visible;
-                MiddleSeparator.Visibility = Visibility.Visible;
-                ActivityPanel.Visibility = Visibility.Visible;
 
-                var usage = data.Usage;
-                RenderLimit(usage.Session, SessionBar, SessionPercent, SessionModels);
-                RenderLimit(usage.Weekly, WeeklyBar, WeeklyPercent, WeeklyModels);
+                if (usage.Balance.IsLegacy)
+                {
+                    // 旧版计划：5 小时 + 每周窗口
+                    CreditsPanel.Visibility = Visibility.Collapsed;
+                    SessionPanel.Visibility = Visibility.Visible;
+                    WeeklyPanel.Visibility = Visibility.Visible;
+                    MiddleSeparator.Visibility = Visibility.Visible;
 
-                var cost = Loc.T("Panel.Cost", usage.Activity?.Cost ?? "—");
-                var period = Loc.T("Panel.Period", usage.Activity?.Period?.Type ?? "—");
-                ActivityText.Text = cost + "　·　" + period;
+                    var session = QuotaPredictor.SummarizeWindow(
+                        usage.Balance.Legacy.Session.RemainingPercent,
+                        usage.Balance.Legacy.Session.ResetsAt,
+                        ResetTime.SessionWindowMs,
+                        usage.Hourly.Buckets);
+
+                    var weekly = QuotaPredictor.SummarizeWindow(
+                        usage.Balance.Legacy.Weekly.RemainingPercent,
+                        usage.Balance.Legacy.Weekly.ResetsAt,
+                        ResetTime.WeekMs,
+                        usage.Daily.Buckets);
+
+                    RenderWindow(SessionBar, SessionPercent, SessionReset, SessionCount, SessionEstimate, session);
+                    RenderWindow(WeeklyBar, WeeklyPercent, WeeklyReset, WeeklyCount, WeeklyEstimate, weekly);
+                }
+                else
+                {
+                    // 信用计划：包含额度 + 购买余额
+                    SessionPanel.Visibility = Visibility.Collapsed;
+                    WeeklyPanel.Visibility = Visibility.Collapsed;
+                    MiddleSeparator.Visibility = Visibility.Collapsed;
+                    CreditsPanel.Visibility = Visibility.Visible;
+
+                    var credits = usage.Balance.Credits;
+                    var total = credits.AllowanceUsd;
+                    var used = total > 0 ? Math.Max(0, Math.Min(1, (total - credits.BalanceUsd) / total)) : 0;
+                    var resetMs = ResetTime.ParseTimestampMs(credits.Period?.Until);
+
+                    CreditsPercent.Text = Loc.T("Panel.Used", Config.FormatUsagePercent(used));
+                    UsageBarRenderer.RenderBar(CreditsBar, used);
+                    CreditsReset.Tag = resetMs;
+                    UpdateCountdownText(CreditsReset, resetMs);
+                    CreditsIncluded.Text = Loc.T("Usage.Included", credits.BalanceUsd.ToString("F2"), total.ToString("F2"));
+                    CreditsBalance.Text = Loc.T("Usage.Balance", usage.Balance.PurchasedUsd.ToString("F2"));
+                }
+
+                // 请求历史图表
+                ChartPanel.Visibility = Visibility.Visible;
+                RenderChart(Chart24hLine, Chart24hMeta, usage.Hourly);
+                RenderChart(Chart7dLine, Chart7dMeta, usage.Daily);
+
                 UpdateCountdowns();
             }
 
             RenderFooter(data);
+        }
+
+        private void HideAllSections()
+        {
+            SessionPanel.Visibility = Visibility.Collapsed;
+            WeeklyPanel.Visibility = Visibility.Collapsed;
+            CreditsPanel.Visibility = Visibility.Collapsed;
+            MiddleSeparator.Visibility = Visibility.Collapsed;
+            ChartPanel.Visibility = Visibility.Collapsed;
         }
 
         private void RenderAccounts(UsageUpdatedEventArgs data)
@@ -128,14 +155,17 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             try
             {
                 AccountCombo.Items.Clear();
-                foreach (var account in data.Accounts.Accounts)
+                if (data?.Accounts != null)
                 {
-                    AccountCombo.Items.Add(new ComboBoxItem
+                    foreach (var account in data.Accounts.Accounts)
                     {
-                        Content = account.Label,
-                        Tag = account.Id,
-                        IsSelected = account.Id == data.Accounts.ActiveId,
-                    });
+                        AccountCombo.Items.Add(new ComboBoxItem
+                        {
+                            Content = account.Label,
+                            Tag = account.Id,
+                            IsSelected = account.Id == data.Accounts.ActiveId,
+                        });
+                    }
                 }
 
                 if (AccountCombo.SelectedIndex < 0 && AccountCombo.Items.Count > 0)
@@ -152,38 +182,72 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             }
         }
 
-        private void RenderLimit(LimitUsage limit, Grid barHost, TextBlock percentText, StackPanel modelHost)
+        /// <summary>渲染一个配额窗口：百分比 + 剩余预测 + 用量条 + 倒计时 + 请求数。</summary>
+        private static void RenderWindow(
+            Grid barHost, TextBlock percentText, TextBlock resetText, TextBlock countText, TextBlock estimateText, WindowSummary summary)
         {
-            // 百分比 + 窗口级剩余次数预测（总请求数 / usage − 总请求数）。
-            var text = Loc.T("Panel.Used", Config.FormatUsagePercent(limit.Usage));
-            var estimate = QuotaPredictor.EstimateRemainingRequests(limit);
-            if (estimate.HasValue)
+            percentText.Text = Loc.T("Panel.Used", Config.FormatUsagePercent(summary.Used));
+
+            if (summary.Estimate.HasValue)
             {
-                text += "　·　" + Loc.T("Panel.Remaining", QuotaPredictor.Format(estimate.Value));
-                percentText.ToolTip = Loc.T("Panel.RemainingTip", QuotaPredictor.Format(estimate.Value));
+                estimateText.Text = Loc.T("Panel.Remaining", QuotaPredictor.Format(summary.Estimate.Value));
+                estimateText.ToolTip = Loc.T("Panel.RemainingTip", QuotaPredictor.Format(summary.Estimate.Value));
+                estimateText.Visibility = Visibility.Visible;
             }
             else
             {
-                percentText.ToolTip = null;
+                estimateText.Visibility = Visibility.Collapsed;
             }
 
-            percentText.Text = text;
+            UsageBarRenderer.RenderBar(barHost, summary.Used);
 
-            // 用量条与模型列表复用共享渲染器，保证与状态栏浮窗显示一致。
-            UsageBarRenderer.RenderBar(barHost, limit);
-            UsageBarRenderer.RenderModelList(modelHost, limit, fontSize: 12);
+            resetText.Tag = summary.ResetMs;
+            UpdateCountdownText(resetText, summary.ResetMs);
+
+            countText.Text = Loc.T("Usage.Requests", summary.Requests.ToString("N0"));
+        }
+
+        /// <summary>渲染请求历史迷你图表（含总量与峰值）。</summary>
+        private static void RenderChart(TextBlock line, TextBlock meta, UsageResponse response)
+        {
+            var buckets = response.Buckets;
+            var total = response.Totals.RequestCount;
+            var peak = 0L;
+            foreach (var bucket in buckets)
+            {
+                if (bucket.RequestCount > peak)
+                {
+                    peak = bucket.RequestCount;
+                }
+            }
+
+            line.Text = UsageBarRenderer.Sparkline(buckets);
+            meta.Text = Loc.T("Usage.Requests", total.ToString("N0")) + "　·　" + Loc.T("Usage.Peak", peak.ToString("N0"));
         }
 
         private void UpdateCountdowns()
         {
-            if (_data?.Usage == null)
+            if (_data?.Usage?.Balance == null)
             {
                 return;
             }
 
-            var now = DateTimeOffset.UtcNow;
-            SessionReset.Text = Loc.T("Panel.ResetIn") + ResetTime.FormatRemaining(ResetTime.NextSessionReset(now) - now);
-            WeeklyReset.Text = Loc.T("Panel.ResetIn") + ResetTime.FormatRemaining(ResetTime.NextWeeklyReset(now) - now);
+            UpdateCountdownText(SessionReset, SessionReset.Tag);
+            UpdateCountdownText(WeeklyReset, WeeklyReset.Tag);
+            UpdateCountdownText(CreditsReset, CreditsReset.Tag);
+        }
+
+        private static void UpdateCountdownText(TextBlock target, object tag)
+        {
+            if (!(tag is long resetMs))
+            {
+                return;
+            }
+
+            var text = resetMs > 0
+                ? ResetTime.FormatRemaining(DateTimeOffset.FromUnixTimeMilliseconds(resetMs) - DateTimeOffset.UtcNow)
+                : "—";
+            target.Text = Loc.T("Panel.ResetIn") + text;
         }
 
         private void SetStatus(string text, bool isError)
@@ -195,8 +259,12 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
         private void RenderFooter(UsageUpdatedEventArgs data)
         {
-            var parts = new List<string> { Loc.T("Panel.AutoRefresh", Config.FormatInterval(data.IntervalSeconds)) };
-            if (data.LastUpdatedMs > 0)
+            var parts = new System.Collections.Generic.List<string>
+            {
+                Loc.T("Panel.AutoRefresh", Config.FormatInterval(data?.IntervalSeconds ?? Config.DefaultRefreshIntervalSeconds)),
+            };
+
+            if (data != null && data.LastUpdatedMs > 0)
             {
                 var local = DateTimeOffset.FromUnixTimeMilliseconds(data.LastUpdatedMs).ToLocalTime();
                 parts.Add(Loc.T("Panel.LastUpdated", local.ToString("HH:mm:ss")));

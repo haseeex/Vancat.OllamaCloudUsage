@@ -9,6 +9,8 @@
         <ResourceDictionary>
             <!-- 描述文字色 -->
             <SolidColorBrush x:Key="DescBrush" Color="#888888" />
+            <!-- 图表等宽字体 -->
+            <FontFamily x:Key="MonoFont">Consolas, Courier New</FontFamily>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -51,11 +53,13 @@
                 <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
                     <Grid x:Name="SessionBar" />
                 </Border>
-                <TextBlock x:Name="SessionReset" FontSize="11" Margin="0,5,0,0"
+                <DockPanel Margin="0,5,0,0">
+                    <TextBlock DockPanel.Dock="Right" x:Name="SessionEstimate" FontSize="11"
+                               Foreground="{StaticResource DescBrush}" Visibility="Collapsed" />
+                    <TextBlock x:Name="SessionReset" FontSize="11" Foreground="{StaticResource DescBrush}" />
+                </DockPanel>
+                <TextBlock x:Name="SessionCount" FontSize="11" Margin="0,4,0,0"
                            Foreground="{StaticResource DescBrush}" />
-                <TextBlock x:Name="SessionModelsLabel" Text="本窗口使用的模型" FontSize="11" Margin="0,16,0,6"
-                           Foreground="{StaticResource DescBrush}" />
-                <StackPanel x:Name="SessionModels" />
             </StackPanel>
 
             <Separator Margin="0,18,0,18" x:Name="MiddleSeparator" Visibility="Collapsed" />
@@ -69,17 +73,46 @@
                 <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
                     <Grid x:Name="WeeklyBar" />
                 </Border>
-                <TextBlock x:Name="WeeklyReset" FontSize="11" Margin="0,5,0,0"
+                <DockPanel Margin="0,5,0,0">
+                    <TextBlock DockPanel.Dock="Right" x:Name="WeeklyEstimate" FontSize="11"
+                               Foreground="{StaticResource DescBrush}" Visibility="Collapsed" />
+                    <TextBlock x:Name="WeeklyReset" FontSize="11" Foreground="{StaticResource DescBrush}" />
+                </DockPanel>
+                <TextBlock x:Name="WeeklyCount" FontSize="11" Margin="0,4,0,0"
                            Foreground="{StaticResource DescBrush}" />
-                <TextBlock x:Name="WeeklyModelsLabel" Text="本周使用的模型" FontSize="11" Margin="0,16,0,6"
-                           Foreground="{StaticResource DescBrush}" />
-                <StackPanel x:Name="WeeklyModels" />
             </StackPanel>
 
-            <!-- 活动摘要 -->
-            <StackPanel x:Name="ActivityPanel" Visibility="Collapsed" Margin="0,18,0,0">
-                <TextBlock x:Name="ActivityLabel" Text="活动" FontSize="11" Foreground="{StaticResource DescBrush}" Margin="0,0,0,6" />
-                <TextBlock x:Name="ActivityText" FontSize="12" TextWrapping="Wrap" />
+            <!-- 信用计划（包含额度 + 购买余额） -->
+            <StackPanel x:Name="CreditsPanel" Visibility="Collapsed">
+                <DockPanel Margin="0,0,0,6">
+                    <TextBlock DockPanel.Dock="Right" x:Name="CreditsPercent" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock x:Name="CreditsTitle" Text="包含额度" FontSize="13" FontWeight="Medium" />
+                </DockPanel>
+                <Border Height="8" CornerRadius="4" Background="#33808080" ClipToBounds="True">
+                    <Grid x:Name="CreditsBar" />
+                </Border>
+                <TextBlock x:Name="CreditsReset" FontSize="11" Margin="0,5,0,0"
+                           Foreground="{StaticResource DescBrush}" />
+                <TextBlock x:Name="CreditsIncluded" FontSize="11" Margin="0,4,0,0"
+                           Foreground="{StaticResource DescBrush}" />
+                <TextBlock x:Name="CreditsBalance" FontSize="11" Margin="0,2,0,0"
+                           Foreground="{StaticResource DescBrush}" />
+            </StackPanel>
+
+            <!-- 请求历史图表 -->
+            <StackPanel x:Name="ChartPanel" Visibility="Collapsed" Margin="0,18,0,0">
+                <TextBlock x:Name="Chart24hTitle" Text="每小时请求（24 小时）" FontSize="11"
+                           Foreground="{StaticResource DescBrush}" Margin="0,0,0,4" />
+                <TextBlock x:Name="Chart24hLine" FontSize="12" FontFamily="{StaticResource MonoFont}"
+                           Margin="0,0,0,2" />
+                <TextBlock x:Name="Chart24hMeta" FontSize="11" Foreground="{StaticResource DescBrush}"
+                           Margin="0,0,0,12" />
+
+                <TextBlock x:Name="Chart7dTitle" Text="每日请求（7 天）" FontSize="11"
+                           Foreground="{StaticResource DescBrush}" Margin="0,0,0,4" />
+                <TextBlock x:Name="Chart7dLine" FontSize="12" FontFamily="{StaticResource MonoFont}"
+                           Margin="0,0,0,2" />
+                <TextBlock x:Name="Chart7dMeta" FontSize="11" Foreground="{StaticResource DescBrush}" />
             </StackPanel>
 
             <!-- 底部状态 -->

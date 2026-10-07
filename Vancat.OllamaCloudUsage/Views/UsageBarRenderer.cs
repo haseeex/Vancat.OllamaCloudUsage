@@ -9,32 +9,20 @@ using Vancat.OllamaCloudUsage.Services;
 
 namespace Vancat.OllamaCloudUsage.Views
 {
-    /// <summary>用量条与模型列表的共用渲染逻辑（状态栏弹窗与工具窗口共用）。</summary>
+    /// <summary>
+    /// 用量条与图表的共用渲染逻辑（状态栏弹窗与工具窗口共用）。
+    ///
+    /// 新版 API 不再提供模型维度数据，用量条改为**单色分级**：
+    /// 蓝色（&lt;75%）→ 琥珀色（≥75%）→ 红色（≥90%）。
+    /// </summary>
     internal static class UsageBarRenderer
     {
-        /// <summary>模型列表各数据列之间的间距。</summary>
-        private const double ColumnGap = 10;
+        /// <summary>用量条分级配色阈值。</summary>
+        private const double AmberThreshold = 0.75;
+        private const double RedThreshold = 0.9;
 
-        /// <summary>
-        /// 让文本块使用等宽数字（tabular figures），使各行数字宽度一致，
-        /// 配合共享尺寸组实现整齐的纵向对齐。字体不支持时静默忽略。
-        /// </summary>
-        private static void UseTabularNumbers(TextBlock text)
-        {
-            try
-            {
-                Typography.SetNumeralAlignment(text, FontNumeralAlignment.Tabular);
-            }
-            catch
-            {
-                // 某些字体/环境不支持 OpenType 数字对齐特性。
-            }
-        }
-
-        public static readonly string[] Palette =
-        {
-            "#2563EB", "#3B82F6", "#4F46E5", "#60A5FA", "#1D4ED8", "#6366F1", "#818CF8", "#93C5FD",
-        };
+        /// <summary>迷你图表的字符高度级别（与 VS Code 版一致的 8 级）。</summary>
+        private static readonly string[] SparkChars = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
 
         /// <summary>描述文字画刷（灰）。</summary>
         public static readonly SolidColorBrush MutedBrush = Frozen("#FF888888");
@@ -42,7 +30,33 @@ namespace Vancat.OllamaCloudUsage.Views
         /// <summary>错误文字画刷（红）。</summary>
         public static readonly SolidColorBrush ErrorBrush = Frozen("#FFE51400");
 
-        public static SolidColorBrush BrushFor(int index) => Frozen(Palette[index % Palette.Length]);
+        /// <summary>用量条底色（半透明灰）。</summary>
+        public static readonly SolidColorBrush BarTrackBrush = Frozen("#33808080");
+
+        /// <summary>
+        /// 用量条颜色：舒适区为蓝色，超过 75% 转琥珀色，超过 90% 转红色。
+        /// </summary>
+        public static Color UsageColor(double usedFraction)
+        {
+            if (usedFraction >= RedThreshold)
+            {
+                return Color.FromRgb(0xE5, 0x53, 0x4B);
+            }
+
+            if (usedFraction >= AmberThreshold)
+            {
+                return Color.FromRgb(0xD2, 0x99, 0x22);
+            }
+
+            return Color.FromRgb(0x25, 0x63, 0xEB);
+        }
+
+        public static SolidColorBrush UsageBrush(double usedFraction)
+        {
+            var brush = new SolidColorBrush(UsageColor(usedFraction));
+            brush.Freeze();
+            return brush;
+        }
 
         private static SolidColorBrush Frozen(string hex)
         {
@@ -51,161 +65,110 @@ namespace Vancat.OllamaCloudUsage.Views
             return brush;
         }
 
-        /// <summary>按模型请求数占比绘制用量条（已填充部分 = 窗口用量）。</summary>
-        public static void RenderBar(Grid host, LimitUsage limit)
+        /// <summary>
+        /// 绘制单色分级用量条：已填充部分 = 窗口用量（按 75%/90% 阈值换色）。
+        /// </summary>
+        public static void RenderBar(Grid host, double usedFraction)
         {
             host.ColumnDefinitions.Clear();
             host.Children.Clear();
 
-            var filled = Math.Max(0, Math.Min(1, limit.Usage));
-            var total = 0L;
-            foreach (var model in limit.Models)
+            var filled = Math.Max(0, Math.Min(1, usedFraction));
+
+            host.ColumnDefinitions.Add(new ColumnDefinition
             {
-                total += model.RequestCount;
-            }
-
-            if (total <= 0 || filled <= 0)
-            {
-                // 空条：单个占位列，灰底由外层容器提供。
-                host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                return;
-            }
-
-            for (var i = 0; i < limit.Models.Count; i++)
-            {
-                var model = limit.Models[i];
-                host.ColumnDefinitions.Add(new ColumnDefinition
-                {
-                    Width = new GridLength((double)model.RequestCount / total * filled, GridUnitType.Star),
-                });
-
-                var segment = new Border
-                {
-                    Background = BrushFor(i),
-                    ToolTip = $"{model.Name}\n{Loc.T("Models.Requests", model.RequestCount.ToString("N0"))}",
-                };
-                Grid.SetColumn(segment, i);
-                host.Children.Add(segment);
-            }
-
-            // 剩余未使用部分占位。
+                Width = new GridLength(Math.Max(filled, 0.0001), GridUnitType.Star),
+            });
             host.ColumnDefinitions.Add(new ColumnDefinition
             {
                 Width = new GridLength(Math.Max(1 - filled, 0.0001), GridUnitType.Star),
             });
-        }
 
-        /// <summary>
-        /// 渲染模型请求列表（色点 + 名称 + 占窗口比例 + 次数 + 剩余预测）。
-        /// 各数据列使用共享尺寸组，保证多行纵向对齐。
-        /// </summary>
-        public static void RenderModelList(StackPanel host, LimitUsage limit, double fontSize = 12)
-        {
-            host.Children.Clear();
-
-            if (limit.Models.Count == 0)
+            if (filled <= 0)
             {
-                host.Children.Add(new TextBlock
-                {
-                    Text = Loc.T("Models.None"),
-                    FontSize = fontSize,
-                    Foreground = MutedBrush,
-                });
                 return;
             }
 
-            // 共享尺寸作用域：让各行的「占窗口 / 次数 / 剩余」列取相同宽度，实现纵向对齐。
-            Grid.SetIsSharedSizeScope(host, true);
+            var fill = new Border { Background = UsageBrush(filled) };
+            Grid.SetColumn(fill, 0);
+            host.Children.Add(fill);
+        }
 
-            for (var i = 0; i < limit.Models.Count; i++)
+        /// <summary>
+        /// 绘制信用计划的额度进度条（已用比例按同一分级配色）。
+        /// </summary>
+        public static void RenderCreditsBar(Grid host, double usedFraction)
+        {
+            RenderBar(host, usedFraction);
+        }
+
+        /// <summary>
+        /// 把请求历史分桶渲染为一行迷你柱状图（按最大值归一化）。
+        /// </summary>
+        public static string Sparkline(IList<UsageBucket> buckets)
+        {
+            if (buckets == null || buckets.Count == 0)
             {
-                var model = limit.Models[i];
-                var row = new Grid { Margin = new Thickness(0, 1.5, 0, 1.5) };
+                return string.Empty;
+            }
 
-                // 列：色点 | 名称(*) | 占窗口 | 次数 | 剩余
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "ModelShare" });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "ModelCount" });
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "ModelRemain" });
-
-                var dot = new Ellipse
+            var max = 0L;
+            foreach (var bucket in buckets)
+            {
+                if (bucket.RequestCount > max)
                 {
-                    Width = 7,
-                    Height = 7,
-                    Margin = new Thickness(0, 0, 6, 0),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Fill = BrushFor(i),
-                };
-                Grid.SetColumn(dot, 0);
-                row.Children.Add(dot);
+                    max = bucket.RequestCount;
+                }
+            }
 
-                var name = new TextBlock
-                {
-                    Text = model.Name,
-                    FontSize = fontSize,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    VerticalAlignment = VerticalAlignment.Center,
-                };
-                Grid.SetColumn(name, 1);
-                row.Children.Add(name);
+            if (max <= 0)
+            {
+                return Repeat(SparkChars[0], buckets.Count);
+            }
 
-                // 窗口占用比例（该模型占窗口总配额的百分比 = 窗口用量 × 该模型请求占比）。
-                var windowShare = QuotaPredictor.ModelWindowShare(limit, model.RequestCount);
-                if (windowShare.HasValue)
+            var builder = new System.Text.StringBuilder(buckets.Count);
+            foreach (var bucket in buckets)
+            {
+                var level = (int)((double)bucket.RequestCount / max * SparkChars.Length);
+                if (level < 0)
                 {
-                    var share = new TextBlock
-                    {
-                        Text = Loc.T("Models.WindowShare", Config.FormatSharePercent(windowShare.Value)),
-                        FontSize = fontSize,
-                        Foreground = MutedBrush,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Right,
-                        Margin = new Thickness(ColumnGap, 0, 0, 0),
-                        ToolTip = Loc.T("Models.WindowShareTip",
-                            Config.FormatSharePercent(windowShare.Value),
-                            Config.FormatUsagePercent(limit.Usage)),
-                    };
-                    Grid.SetColumn(share, 2);
-                    UseTabularNumbers(share);
-                    row.Children.Add(share);
+                    level = 0;
+                }
+                else if (level >= SparkChars.Length)
+                {
+                    level = SparkChars.Length - 1;
                 }
 
-                var count = new TextBlock
-                {
-                    Text = Loc.T("Models.Requests", model.RequestCount.ToString("N0")),
-                    FontSize = fontSize,
-                    Foreground = MutedBrush,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(ColumnGap, 0, 0, 0),
-                };
-                Grid.SetColumn(count, 3);
-                UseTabularNumbers(count);
-                row.Children.Add(count);
+                builder.Append(SparkChars[level]);
+            }
 
-                var estimate = QuotaPredictor.EstimateRemainingRequestsForModel(limit, model.RequestCount);
-                if (estimate.HasValue)
-                {
-                    // 提示里同时给出窗口容量与已用次数，便于核对算法。
-                    var capacity = QuotaPredictor.WindowCapacity(limit);
-                    var remain = new TextBlock
-                    {
-                        Text = Loc.T("Models.Remaining", QuotaPredictor.Format(estimate.Value)),
-                        FontSize = fontSize,
-                        Foreground = MutedBrush,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        HorizontalAlignment = HorizontalAlignment.Right,
-                        Margin = new Thickness(ColumnGap, 0, 0, 0),
-                        ToolTip = Loc.T("Models.RemainingTip",
-                            QuotaPredictor.Format(capacity ?? 0), QuotaPredictor.Format(estimate.Value)),
-                    };
-                    Grid.SetColumn(remain, 4);
-                    UseTabularNumbers(remain);
-                    row.Children.Add(remain);
-                }
+            return builder.ToString();
+        }
 
-                host.Children.Add(row);
+        private static string Repeat(string text, int count)
+        {
+            var builder = new System.Text.StringBuilder(text.Length * Math.Max(0, count));
+            for (var i = 0; i < count; i++)
+            {
+                builder.Append(text);
+            }
+
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// 让文本块使用等宽数字（tabular figures），使各行数字宽度一致，
+        /// 配合共享尺寸组实现整齐的纵向对齐。字体不支持时静默忽略。
+        /// </summary>
+        public static void UseTabularNumbers(TextBlock text)
+        {
+            try
+            {
+                Typography.SetNumeralAlignment(text, FontNumeralAlignment.Tabular);
+            }
+            catch
+            {
+                // 某些字体/环境不支持 OpenType 数字对齐特性。
             }
         }
     }

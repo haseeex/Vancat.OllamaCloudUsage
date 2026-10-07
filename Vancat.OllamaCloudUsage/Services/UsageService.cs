@@ -8,7 +8,7 @@ namespace Vancat.OllamaCloudUsage.Services
     /// <summary>用量数据更新事件参数。</summary>
     public sealed class UsageUpdatedEventArgs : EventArgs
     {
-        public UsageResponse Usage { get; set; }
+        public UsageSnapshot Usage { get; set; }
         public string Error { get; set; }
         public bool Loading { get; set; }
         public AccountsState Accounts { get; set; }
@@ -38,7 +38,7 @@ namespace Vancat.OllamaCloudUsage.Services
 
         public event EventHandler<UsageUpdatedEventArgs> Updated;
 
-        public UsageResponse Usage { get; private set; }
+        public UsageSnapshot Usage { get; private set; }
         public string Error { get; private set; }
         public bool Loading { get; private set; }
         public AccountsState Accounts { get; private set; } = new AccountsState();
@@ -113,7 +113,7 @@ namespace Vancat.OllamaCloudUsage.Services
                     var snapshot = _cache.Read();
                     if (SharedUsageCache.IsFresh(snapshot, TimeSpan.FromSeconds(IntervalSeconds), active.Id))
                     {
-                        var cached = OllamaApiClient.ParseUsage(snapshot.Usage);
+                        var cached = BuildSnapshot(snapshot.Hourly, snapshot.Daily, snapshot.Balance);
                         lock (_sync)
                         {
                             Usage = cached;
@@ -138,19 +138,22 @@ namespace Vancat.OllamaCloudUsage.Services
                 try
                 {
                     // 拉取原始 JSON：解析给界面，原样写入缓存（保留服务端字段名）。
-                    var raw = await _api.FetchUsageJsonAsync(active.Key, CancellationToken.None).ConfigureAwait(false);
-                    var usage = OllamaApiClient.ParseUsage(raw);
+                    var hourlyRaw = await _api.FetchUsageJsonAsync(active.Key, UsageRange.Last24Hours, CancellationToken.None).ConfigureAwait(false);
+                    var dailyRaw = await _api.FetchUsageJsonAsync(active.Key, UsageRange.Last7Days, CancellationToken.None).ConfigureAwait(false);
+                    var balanceRaw = await _api.FetchBalanceJsonAsync(active.Key, CancellationToken.None).ConfigureAwait(false);
+
+                    var snapshot = BuildSnapshot(hourlyRaw, dailyRaw, balanceRaw);
                     var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
                     lock (_sync)
                     {
-                        Usage = usage;
+                        Usage = snapshot;
                         Error = null;
                         Loading = false;
                         LastUpdatedMs = nowMs;
                     }
 
-                    _cache.Write(raw, active.Id);
+                    _cache.Write(hourlyRaw, dailyRaw, balanceRaw, active.Id);
                 }
                 catch (UsageApiException ex)
                 {
@@ -178,6 +181,17 @@ namespace Vancat.OllamaCloudUsage.Services
                     _inFlight = null;
                 }
             }
+        }
+
+        /// <summary>把三份原始 JSON 解析为界面用的快照对象。</summary>
+        private static UsageSnapshot BuildSnapshot(JObject hourly, JObject daily, JObject balance)
+        {
+            return new UsageSnapshot
+            {
+                Hourly = OllamaApiClient.ParseUsage(hourly),
+                Daily = OllamaApiClient.ParseUsage(daily),
+                Balance = OllamaApiClient.ParseBalance(balance),
+            };
         }
 
         private void RaiseUpdated()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,42 +10,103 @@ using Newtonsoft.Json.Linq;
 
 namespace Vancat.OllamaCloudUsage.Services
 {
-    /// <summary>单个模型的用量记录。</summary>
-    public sealed class ModelUsage
+    /// <summary>`GET /api/usage` 接受的时间范围。</summary>
+    public enum UsageRange
     {
-        public string Name { get; set; }
+        Last24Hours,
+        Last7Days,
+        Last30Days,
+    }
+
+    /// <summary>用量指标：旧版计划仅上报请求数，其余指标为可选。</summary>
+    public sealed class UsageMetrics
+    {
         public long RequestCount { get; set; }
+        public double? UsageUsd { get; set; }
+        public long? InputTokens { get; set; }
+        public long? CachedInputTokens { get; set; }
+        public long? OutputTokens { get; set; }
     }
 
-    /// <summary>单个限额窗口（会话 / 每周）的用量。</summary>
-    public sealed class LimitUsage
+    /// <summary>单个时间分桶（按小时或按天）。</summary>
+    public sealed class UsageBucket
     {
-        public double Usage { get; set; }
-        public List<ModelUsage> Models { get; set; } = new List<ModelUsage>();
+        public string From { get; set; }
+        public string Until { get; set; }
+        public bool Partial { get; set; }
+        public UsageMetrics Metrics { get; set; } = new UsageMetrics();
+
+        public long RequestCount => Metrics.RequestCount;
     }
 
-    /// <summary>活动周期信息。</summary>
-    public sealed class ActivityPeriod
-    {
-        public string Type { get; set; }
-        public string StartingAt { get; set; }
-        public string EndingAt { get; set; }
-    }
-
-    /// <summary>活动统计。</summary>
-    public sealed class ActivityInfo
-    {
-        public string Cost { get; set; }
-        public ActivityPeriod Period { get; set; }
-        public List<ModelUsage> Models { get; set; } = new List<ModelUsage>();
-    }
-
-    /// <summary>Ollama Cloud 用量响应。</summary>
+    /// <summary>`GET /api/usage?range=…` 的响应。</summary>
     public sealed class UsageResponse
     {
-        public ActivityInfo Activity { get; set; }
-        public LimitUsage Session { get; set; }
-        public LimitUsage Weekly { get; set; }
+        public string Range { get; set; }
+        public string Scope { get; set; }
+        public string Granularity { get; set; }
+        public string From { get; set; }
+        public string Until { get; set; }
+        public UsageMetrics Totals { get; set; } = new UsageMetrics();
+        public List<UsageBucket> Buckets { get; set; } = new List<UsageBucket>();
+    }
+
+    /// <summary>旧版计划的一个配额窗口（5 小时会话 / 每周），按剩余百分比计。</summary>
+    public sealed class BalanceWindow
+    {
+        public double RemainingPercent { get; set; }
+        public string ResetsAt { get; set; }
+    }
+
+    /// <summary>旧版计划余额：会话与每周两个窗口。</summary>
+    public sealed class LegacyIncludedBalance
+    {
+        public BalanceWindow Session { get; set; }
+        public BalanceWindow Weekly { get; set; }
+    }
+
+    /// <summary>信用计划的周期信息。</summary>
+    public sealed class CreditsPeriod
+    {
+        public string From { get; set; }
+        public string Until { get; set; }
+    }
+
+    /// <summary>信用计划余额：包含额度与周期。</summary>
+    public sealed class CreditsIncludedBalance
+    {
+        public double BalanceUsd { get; set; }
+        public double AllowanceUsd { get; set; }
+        public CreditsPeriod Period { get; set; }
+    }
+
+    /// <summary>`GET /api/balance` 的响应（两种计划形态之一）。</summary>
+    public sealed class BalanceResponse
+    {
+        /// <summary>旧版计划的会话/每周窗口；信用计划时为 null。</summary>
+        public LegacyIncludedBalance Legacy { get; set; }
+
+        /// <summary>信用计划的额度信息；旧版计划时为 null。</summary>
+        public CreditsIncludedBalance Credits { get; set; }
+
+        /// <summary>已购买余额（美元）。</summary>
+        public double PurchasedUsd { get; set; }
+
+        /// <summary>是否为旧版（会话/每周窗口）计划。</summary>
+        public bool IsLegacy => Legacy != null;
+    }
+
+    /// <summary>一次刷新所需的全部数据：小时/每日请求历史 + 配额余额。</summary>
+    public sealed class UsageSnapshot
+    {
+        /// <summary>按小时分桶（用于 5 小时会话窗口的请求数统计）。</summary>
+        public UsageResponse Hourly { get; set; }
+
+        /// <summary>按天分桶（用于每周窗口的请求数统计）。</summary>
+        public UsageResponse Daily { get; set; }
+
+        /// <summary>配额余额（用量百分比与权威重置时间）。</summary>
+        public BalanceResponse Balance { get; set; }
     }
 
     /// <summary>用量 API 异常。</summary>
@@ -54,10 +116,19 @@ namespace Vancat.OllamaCloudUsage.Services
         public UsageApiException(string message, Exception inner) : base(message, inner) { }
     }
 
-    /// <summary>Ollama Cloud 用量 API 客户端。</summary>
+    /// <summary>
+    /// Ollama Cloud API 客户端（适配官方 2026-10-06 改版）。
+    ///
+    /// 端点：
+    /// - `GET /api/usage?range=24h|7d|30d`：按小时/天分桶的请求计数，
+    ///   可选 `usage_usd`、`input_tokens` 等指标（旧版计划仅有请求数）。
+    /// - `GET /api/balance`：5 小时 / 每周窗口的剩余百分比与权威重置时间
+    ///   （旧版计划），或包含额度与周期（信用计划）。
+    /// </summary>
     public sealed class OllamaApiClient : IDisposable
     {
         private const string UsageUrl = "https://ollama.com/api/usage";
+        private const string BalanceUrl = "https://ollama.com/api/balance";
         private const int MaxResponseBytes = 1024 * 1024;
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
@@ -89,25 +160,77 @@ namespace Vancat.OllamaCloudUsage.Services
             }
         }
 
-        public async Task<UsageResponse> FetchUsageAsync(string apiKey, CancellationToken cancellationToken)
+        /// <summary>
+        /// 拉取一次刷新所需的全部数据（并行请求 24h、7d 用量与余额）。
+        /// </summary>
+        public async Task<UsageSnapshot> FetchSnapshotAsync(string apiKey, CancellationToken cancellationToken)
         {
-            var json = await FetchUsageJsonAsync(apiKey, cancellationToken).ConfigureAwait(false);
-            return ParseUsage(json);
+            var hourlyTask = FetchUsageAsync(apiKey, UsageRange.Last24Hours, cancellationToken);
+            var dailyTask = FetchUsageAsync(apiKey, UsageRange.Last7Days, cancellationToken);
+            var balanceTask = FetchBalanceAsync(apiKey, cancellationToken);
+
+            await Task.WhenAll(hourlyTask, dailyTask, balanceTask).ConfigureAwait(false);
+
+            return new UsageSnapshot
+            {
+                Hourly = await hourlyTask.ConfigureAwait(false),
+                Daily = await dailyTask.ConfigureAwait(false),
+                Balance = await balanceTask.ConfigureAwait(false),
+            };
         }
 
         /// <summary>
         /// 拉取用量并返回原始 JSON（用于缓存写入，保留服务端的字段名）。
         /// </summary>
-        public async Task<JObject> FetchUsageJsonAsync(string apiKey, CancellationToken cancellationToken)
+        public async Task<JObject> FetchUsageJsonAsync(string apiKey, UsageRange range, CancellationToken cancellationToken)
+        {
+            var url = UsageUrl + "?range=" + ToRangeText(range);
+            return await GetJsonAsync(url, apiKey, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>拉取余额原始 JSON。</summary>
+        public async Task<JObject> FetchBalanceJsonAsync(string apiKey, CancellationToken cancellationToken)
+        {
+            return await GetJsonAsync(BalanceUrl, apiKey, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>拉取并解析用量。</summary>
+        public async Task<UsageResponse> FetchUsageAsync(string apiKey, UsageRange range, CancellationToken cancellationToken)
+        {
+            var json = await FetchUsageJsonAsync(apiKey, range, cancellationToken).ConfigureAwait(false);
+            return ParseUsage(json);
+        }
+
+        /// <summary>拉取并解析余额。</summary>
+        public async Task<BalanceResponse> FetchBalanceAsync(string apiKey, CancellationToken cancellationToken)
+        {
+            var json = await FetchBalanceJsonAsync(apiKey, cancellationToken).ConfigureAwait(false);
+            return ParseBalance(json);
+        }
+
+        private static string ToRangeText(UsageRange range)
+        {
+            switch (range)
+            {
+                case UsageRange.Last24Hours:
+                    return "24h";
+                case UsageRange.Last30Days:
+                    return "30d";
+                default:
+                    return "7d";
+            }
+        }
+
+        private async Task<JObject> GetJsonAsync(string url, string apiKey, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
             {
                 throw new UsageApiException(Loc.T("Err.EmptyKey"));
             }
 
-            using (var request = new HttpRequestMessage(HttpMethod.Get, UsageUrl))
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
             {
-                request.Headers.Add("Authorization", apiKey.Trim());
+                request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + apiKey.Trim());
                 HttpResponseMessage response;
                 try
                 {
@@ -125,6 +248,29 @@ namespace Vancat.OllamaCloudUsage.Services
 
                 using (response)
                 {
+                    // 429：提示等待秒数（Retry-After）。
+                    if ((int)response.StatusCode == 429)
+                    {
+                        double? retryAfter = null;
+                        var retryHeader = response.Headers.RetryAfter;
+                        if (retryHeader != null)
+                        {
+                            if (retryHeader.Delta.HasValue)
+                            {
+                                retryAfter = retryHeader.Delta.Value.TotalSeconds;
+                            }
+                            else if (retryHeader.Date.HasValue)
+                            {
+                                retryAfter = (retryHeader.Date.Value - DateTimeOffset.UtcNow).TotalSeconds;
+                            }
+                        }
+
+                        var seconds = retryAfter.HasValue
+                            ? Math.Max(0, Math.Round(retryAfter.Value)).ToString("0")
+                            : "?";
+                        throw new UsageApiException(Loc.T("Err.RateLimited", seconds));
+                    }
+
                     if (!response.IsSuccessStatusCode)
                     {
                         throw new UsageApiException(Loc.T("Err.HttpStatus", (int)response.StatusCode));
@@ -148,33 +294,107 @@ namespace Vancat.OllamaCloudUsage.Services
             }
         }
 
+        // ---- 解析 ----
+
         internal static UsageResponse ParseUsage(JObject root)
         {
-            var activity = RequireObject(root, "activity", "activity");
-            var period = RequireObject(activity, "period", "activity.period");
-            var limits = RequireObject(root, "limits", "limits");
-
             return new UsageResponse
             {
-                Activity = new ActivityInfo
-                {
-                    Cost = RequireString(activity, "cost", "activity.cost"),
-                    Period = new ActivityPeriod
-                    {
-                        Type = RequireString(period, "type", "activity.period.type"),
-                        StartingAt = RequireString(period, "starting_at", "activity.period.starting_at"),
-                        EndingAt = RequireString(period, "ending_at", "activity.period.ending_at"),
-                    },
-                    Models = ParseModels(activity["models"], "activity.models"),
-                },
-                Session = ParseLimit(limits["session"], "limits.session"),
-                Weekly = ParseLimit(limits["weekly"], "limits.weekly"),
+                Range = RequireString(root, "range", "range"),
+                Scope = RequireString(root, "scope", "scope"),
+                Granularity = RequireString(root, "granularity", "granularity"),
+                From = RequireString(root, "from", "from"),
+                Until = RequireString(root, "until", "until"),
+                Totals = ParseMetrics(root["totals"], "totals"),
+                Buckets = ParseBuckets(root["buckets"], "buckets"),
             };
         }
 
-        private static JObject RequireObject(JObject parent, string key, string displayName)
+        internal static BalanceResponse ParseBalance(JObject root)
         {
-            var token = parent[key];
+            var included = RequireObject(root["included"], "included");
+            var purchased = RequireObject(root["purchased"], "purchased");
+
+            var response = new BalanceResponse
+            {
+                PurchasedUsd = RequireNumber(purchased, "balance_usd", "purchased.balance_usd"),
+            };
+
+            // 旧版计划带 session/weekly 窗口；信用计划带美元额度。
+            if (included["session"] != null && included["weekly"] != null)
+            {
+                response.Legacy = new LegacyIncludedBalance
+                {
+                    Session = ParseBalanceWindow(included["session"], "included.session"),
+                    Weekly = ParseBalanceWindow(included["weekly"], "included.weekly"),
+                };
+            }
+            else
+            {
+                var period = RequireObject(included["period"], "included.period");
+                response.Credits = new CreditsIncludedBalance
+                {
+                    BalanceUsd = RequireNumber(included, "balance_usd", "included.balance_usd"),
+                    AllowanceUsd = RequireNumber(included, "allowance_usd", "included.allowance_usd"),
+                    Period = new CreditsPeriod
+                    {
+                        From = RequireString(period, "from", "included.period.from"),
+                        Until = RequireString(period, "until", "included.period.until"),
+                    },
+                };
+            }
+
+            return response;
+        }
+
+        private static BalanceWindow ParseBalanceWindow(JToken token, string name)
+        {
+            var obj = RequireObject(token, name);
+            return new BalanceWindow
+            {
+                RemainingPercent = RequireNumber(obj, "remaining_percent", name + ".remaining_percent"),
+                ResetsAt = RequireString(obj, "resets_at", name + ".resets_at"),
+            };
+        }
+
+        private static UsageMetrics ParseMetrics(JToken token, string name)
+        {
+            var obj = RequireObject(token, name);
+            return new UsageMetrics
+            {
+                RequestCount = (long)RequireNumber(obj, "request_count", name + ".request_count"),
+                UsageUsd = OptionalNumber(obj["usage_usd"]),
+                InputTokens = OptionalLong(obj["input_tokens"]),
+                CachedInputTokens = OptionalLong(obj["cached_input_tokens"]),
+                OutputTokens = OptionalLong(obj["output_tokens"]),
+            };
+        }
+
+        private static List<UsageBucket> ParseBuckets(JToken token, string name)
+        {
+            if (!(token is JArray array))
+            {
+                throw new UsageApiException(Loc.T("Err.InvalidField", name));
+            }
+
+            var result = new List<UsageBucket>();
+            for (var i = 0; i < array.Count; i++)
+            {
+                var item = RequireObject(array[i], name + "[" + i + "]");
+                result.Add(new UsageBucket
+                {
+                    From = RequireString(item, "from", name + "[" + i + "].from"),
+                    Until = RequireString(item, "until", name + "[" + i + "].until"),
+                    Partial = item["partial"] != null && item["partial"].Type == JTokenType.Boolean && item["partial"].Value<bool>(),
+                    Metrics = ParseMetrics(item, name + "[" + i + "]"),
+                });
+            }
+
+            return result;
+        }
+
+        private static JObject RequireObject(JToken token, string displayName)
+        {
             if (token is JObject obj)
             {
                 return obj;
@@ -194,57 +414,32 @@ namespace Vancat.OllamaCloudUsage.Services
             throw new UsageApiException(Loc.T("Err.InvalidField", name));
         }
 
-        private static List<ModelUsage> ParseModels(JToken token, string name)
+        private static double RequireNumber(JObject parent, string key, string name)
         {
-            if (!(token is JArray array))
+            var token = parent[key];
+            if (token != null && (token.Type == JTokenType.Integer || token.Type == JTokenType.Float))
             {
-                throw new UsageApiException(Loc.T("Err.InvalidField", name));
+                return token.Value<double>();
             }
 
-            var result = new List<ModelUsage>();
-            for (var i = 0; i < array.Count; i++)
-            {
-                if (!(array[i] is JObject item))
-                {
-                    throw new UsageApiException(Loc.T("Err.InvalidField", $"{name}[{i}]"));
-                }
-
-                var modelName = item["name"];
-                var count = item["request_count"];
-                if (modelName == null || modelName.Type != JTokenType.String ||
-                    count == null || (count.Type != JTokenType.Integer && count.Type != JTokenType.Float))
-                {
-                    throw new UsageApiException(Loc.T("Err.InvalidField", $"{name}[{i}]"));
-                }
-
-                result.Add(new ModelUsage
-                {
-                    Name = modelName.Value<string>(),
-                    RequestCount = count.Value<long>(),
-                });
-            }
-
-            return result;
+            throw new UsageApiException(Loc.T("Err.InvalidField", name));
         }
 
-        private static LimitUsage ParseLimit(JToken token, string name)
+        /// <summary>可选数值：缺失或格式异常时返回 null（不视为错误）。</summary>
+        private static double? OptionalNumber(JToken token)
         {
-            if (!(token is JObject obj))
+            if (token != null && (token.Type == JTokenType.Integer || token.Type == JTokenType.Float))
             {
-                throw new UsageApiException(Loc.T("Err.InvalidField", name));
+                return token.Value<double>();
             }
 
-            var usage = obj["usage"];
-            if (usage == null || (usage.Type != JTokenType.Integer && usage.Type != JTokenType.Float))
-            {
-                throw new UsageApiException(Loc.T("Err.InvalidField", $"{name}.usage"));
-            }
+            return null;
+        }
 
-            return new LimitUsage
-            {
-                Usage = usage.Value<double>(),
-                Models = ParseModels(obj["models"], $"{name}.models"),
-            };
+        private static long? OptionalLong(JToken token)
+        {
+            var value = OptionalNumber(token);
+            return value.HasValue ? (long)value.Value : (long?)null;
         }
 
         public void Dispose()

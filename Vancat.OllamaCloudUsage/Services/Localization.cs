@@ -83,6 +83,7 @@ namespace Vancat.OllamaCloudUsage.Services
         {
             // 状态栏
             ["StatusBar.Text"] = "Ollama  5h: {0}%  Wk: {1}%",
+            ["StatusBar.Credits"] = "Ollama  Credits: {0}%",
             ["StatusBar.Loading"] = "Ollama …",
             ["StatusBar.NoData"] = "Ollama —",
             ["StatusBar.Tooltip"] = "Open Ollama Cloud usage panel",
@@ -108,6 +109,16 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Panel.AddKey"] = "Add API key",
             ["Panel.SessionWindow"] = "5-hour window usage",
             ["Panel.WeeklyWindow"] = "Weekly window usage",
+            ["Panel.IncludedCredits"] = "Included credits",
+            ["Panel.Credits"] = "Credit usage",
+            ["Usage.Included"] = "Included: ${0} of ${1}",
+            ["Usage.IncludedShort"] = "${0} / ${1}",
+            ["Usage.Balance"] = "Purchased balance: ${0}",
+            ["Usage.Cost"] = " · ${0}",
+            ["Usage.Requests"] = "{0} req.",
+            ["Usage.Peak"] = "peak {0}",
+            ["Usage.24h"] = "Requests (24 h)",
+            ["Usage.7d"] = "Requests (7 d)",
             ["Panel.SessionModels"] = "Models this window",
             ["Panel.WeeklyModels"] = "Models this week",
             ["Panel.Used"] = "Used {0}%",
@@ -188,6 +199,7 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Err.ResponseTooLarge"] = "Ollama response too large.",
             ["Err.InvalidResponse"] = "Invalid Ollama response.",
             ["Err.InvalidField"] = "Invalid {0} in Ollama response.",
+            ["Err.RateLimited"] = "Ollama rate limited. Please wait {0} s before retrying.",
             ["Err.RefreshFailed"] = "Refresh failed: {0}",
 
             // 面板标题
@@ -198,6 +210,7 @@ namespace Vancat.OllamaCloudUsage.Services
         {
             // 状态栏
             ["StatusBar.Text"] = "Ollama  5时: {0}%  周: {1}%",
+            ["StatusBar.Credits"] = "Ollama  额度: {0}%",
             ["StatusBar.Loading"] = "Ollama …",
             ["StatusBar.NoData"] = "Ollama —",
             ["StatusBar.Tooltip"] = "打开 Ollama Cloud 用量面板",
@@ -223,6 +236,16 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Panel.AddKey"] = "添加 API 密钥",
             ["Panel.SessionWindow"] = "5 小时窗口用量",
             ["Panel.WeeklyWindow"] = "每周窗口用量",
+            ["Panel.IncludedCredits"] = "包含额度",
+            ["Panel.Credits"] = "额度用量",
+            ["Usage.Included"] = "包含额度：${0} / ${1}",
+            ["Usage.IncludedShort"] = "${0} / ${1}",
+            ["Usage.Balance"] = "购买余额：${0}",
+            ["Usage.Cost"] = " · ${0}",
+            ["Usage.Requests"] = "{0} 次请求",
+            ["Usage.Peak"] = "峰值 {0}",
+            ["Usage.24h"] = "每小时请求（24 小时）",
+            ["Usage.7d"] = "每日请求（7 天）",
             ["Panel.SessionModels"] = "本窗口使用的模型",
             ["Panel.WeeklyModels"] = "本周使用的模型",
             ["Panel.Used"] = "已用 {0}%",
@@ -302,6 +325,7 @@ namespace Vancat.OllamaCloudUsage.Services
             ["Err.ResponseTooLarge"] = "Ollama 响应过大。",
             ["Err.InvalidResponse"] = "Ollama 响应无效。",
             ["Err.InvalidField"] = "Ollama 响应中的 {0} 无效。",
+            ["Err.RateLimited"] = "Ollama 请求受限，请等待 {0} 秒后重试。",
             ["Err.RefreshFailed"] = "刷新失败：{0}",
 
             // 面板标题
