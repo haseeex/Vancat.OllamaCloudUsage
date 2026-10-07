@@ -168,10 +168,14 @@ namespace Vancat.OllamaCloudUsage.Views
                 {
                     Height = barHeight,
                     MaxWidth = ChartBarMaxWidth,
+
+                    // 关键：必须用 Stretch（而非 Center）！
+                    // Border 没有内容时，Center 会按「内容宽度」布局 = 0px，柱子完全不可见。
+                    // Stretch 会填满列宽，再受 MaxWidth 限制后自动居中。
                     VerticalAlignment = VerticalAlignment.Bottom,
-                    HorizontalAlignment = HorizontalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
                     Background = brush,
-                    Margin = new Thickness(0.5, 0, 0.5, 0),
+                    Margin = new Thickness(1, 0, 1, 0),
                     CornerRadius = new CornerRadius(1),
                     ToolTip = Loc.T("Usage.Requests", count.ToString("N0")),
                 };

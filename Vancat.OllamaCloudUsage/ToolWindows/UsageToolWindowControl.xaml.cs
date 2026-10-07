@@ -69,6 +69,11 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
         {
             _data = data;
 
+            // 刷新中：按钮进入忙碌状态（禁用 + 显示省略号），给用户明确反馈。
+            var loading = data?.Loading == true;
+            RefreshButton.IsEnabled = !loading;
+            RefreshButton.Content = loading ? "…" : "⟳";
+
             RenderAccounts(data);
 
             var usage = data?.Usage;
@@ -82,7 +87,16 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             }
             else
             {
-                StatusText.Visibility = Visibility.Collapsed;
+                // 有数据时若刷新失败，仍显示错误提示（不遮挡已有数据）。
+                if (!string.IsNullOrEmpty(data.Error))
+                {
+                    SetStatus("⚠ " + data.Error, true);
+                }
+                else
+                {
+                    StatusText.Visibility = Visibility.Collapsed;
+                }
+
                 AddKeyButton.Visibility = Visibility.Collapsed;
 
                 if (usage.Balance.IsLegacy)

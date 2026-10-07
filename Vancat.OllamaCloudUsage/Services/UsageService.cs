@@ -137,10 +137,18 @@ namespace Vancat.OllamaCloudUsage.Services
 
                 try
                 {
+                    // 三个端点并行请求：总耗时约等于最慢的一个（约 1.5s），
+                    // 而非串行的三倍（约 4.5s）—— 手动刷新时体感差异明显。
+                    var hourlyTask = _api.FetchUsageJsonAsync(active.Key, UsageRange.Last24Hours, CancellationToken.None);
+                    var dailyTask = _api.FetchUsageJsonAsync(active.Key, UsageRange.Last7Days, CancellationToken.None);
+                    var balanceTask = _api.FetchBalanceJsonAsync(active.Key, CancellationToken.None);
+
+                    await Task.WhenAll(hourlyTask, dailyTask, balanceTask).ConfigureAwait(false);
+
                     // 拉取原始 JSON：解析给界面，原样写入缓存（保留服务端字段名）。
-                    var hourlyRaw = await _api.FetchUsageJsonAsync(active.Key, UsageRange.Last24Hours, CancellationToken.None).ConfigureAwait(false);
-                    var dailyRaw = await _api.FetchUsageJsonAsync(active.Key, UsageRange.Last7Days, CancellationToken.None).ConfigureAwait(false);
-                    var balanceRaw = await _api.FetchBalanceJsonAsync(active.Key, CancellationToken.None).ConfigureAwait(false);
+                    var hourlyRaw = await hourlyTask.ConfigureAwait(false);
+                    var dailyRaw = await dailyTask.ConfigureAwait(false);
+                    var balanceRaw = await balanceTask.ConfigureAwait(false);
 
                     var snapshot = BuildSnapshot(hourlyRaw, dailyRaw, balanceRaw);
                     var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
