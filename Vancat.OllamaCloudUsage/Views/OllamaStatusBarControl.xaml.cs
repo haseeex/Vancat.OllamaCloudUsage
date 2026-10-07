@@ -417,16 +417,19 @@ namespace Vancat.OllamaCloudUsage.Views
                 Text = title,
                 FontSize = 10,
                 Foreground = UsageBarRenderer.MutedBrush,
-                Margin = new Thickness(0, 0, 0, 2),
+                Margin = new Thickness(0, 0, 0, 3),
             });
 
-            HoverContent.Children.Add(new TextBlock
+            // 矩形柱状图（底部严格对齐，不用块字符避免基线参差）。
+            var chartHost = new Grid();
+            var chartBorder = new Border
             {
-                Text = UsageBarRenderer.Sparkline(buckets),
-                FontSize = 11,
-                FontFamily = new FontFamily("Consolas, Courier New"),
-                Margin = new Thickness(0, 0, 0, 2),
-            });
+                Height = UsageBarRenderer.ChartHeight,
+                Margin = new Thickness(0, 0, 0, 3),
+                Child = chartHost,
+            };
+            UsageBarRenderer.RenderChart(chartHost, buckets);
+            HoverContent.Children.Add(chartBorder);
 
             HoverContent.Children.Add(new TextBlock
             {

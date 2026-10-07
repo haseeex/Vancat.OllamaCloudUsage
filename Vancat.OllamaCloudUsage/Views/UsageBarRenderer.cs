@@ -24,6 +24,18 @@ namespace Vancat.OllamaCloudUsage.Views
         /// <summary>迷你图表的字符高度级别（与 VS Code 版一致的 8 级）。</summary>
         private static readonly string[] SparkChars = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
 
+        /// <summary>图表柱子的默认高度（像素）。</summary>
+        public const double ChartHeight = 26;
+
+        /// <summary>图表柱子的最大宽度（像素），避免分桶少时柱子过粗。</summary>
+        public const double ChartBarMaxWidth = 24;
+
+        /// <summary>图表柱子的颜色（比用量条稍柔和的蓝）。</summary>
+        private static readonly SolidColorBrush ChartBarBrush = Frozen("#FF4A7DE8");
+
+        /// <summary>零值柱的基线色（半透明灰）。</summary>
+        private static readonly SolidColorBrush ChartZeroBrush = Frozen("#40808080");
+
         /// <summary>描述文字画刷（灰）。</summary>
         public static readonly SolidColorBrush MutedBrush = Frozen("#FF888888");
 
@@ -103,7 +115,75 @@ namespace Vancat.OllamaCloudUsage.Views
         }
 
         /// <summary>
+        /// 把请求历史分桶渲染为**矩形柱状图**（底部对齐）。
+        ///
+        /// 不用 Unicode 块字符（▁▂▃▄▅▆▇█）的原因：块字符的高度依赖字体的
+        /// 基线取整，不同字号/字体下会出现底部参差不齐；用真实矩形绘制可保证
+        /// 所有柱子底部严格对齐，且高度可像素级精确控制。
+        /// </summary>
+        /// <param name="host">承载图表的 Grid（列宽按分桶数等分）。</param>
+        /// <param name="buckets">请求历史分桶。</param>
+        /// <param name="height">图表高度（像素），默认 26。</param>
+        public static void RenderChart(Grid host, IList<UsageBucket> buckets, double height = ChartHeight)
+        {
+            host.ColumnDefinitions.Clear();
+            host.Children.Clear();
+
+            if (buckets == null || buckets.Count == 0)
+            {
+                return;
+            }
+
+            var max = 0L;
+            foreach (var bucket in buckets)
+            {
+                if (bucket.RequestCount > max)
+                {
+                    max = bucket.RequestCount;
+                }
+            }
+
+            for (var i = 0; i < buckets.Count; i++)
+            {
+                host.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var count = buckets[i].RequestCount;
+                double barHeight;
+                Brush brush;
+
+                if (count <= 0 || max <= 0)
+                {
+                    // 零值：仅显示一条细基线，保持视觉连续性。
+                    barHeight = 1.5;
+                    brush = ChartZeroBrush;
+                }
+                else
+                {
+                    // 非零值至少 2px，避免小用量柱消失。
+                    barHeight = Math.Max(2, (double)count / max * height);
+                    brush = ChartBarBrush;
+                }
+
+                var bar = new Border
+                {
+                    Height = barHeight,
+                    MaxWidth = ChartBarMaxWidth,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Background = brush,
+                    Margin = new Thickness(0.5, 0, 0.5, 0),
+                    CornerRadius = new CornerRadius(1),
+                    ToolTip = Loc.T("Usage.Requests", count.ToString("N0")),
+                };
+
+                Grid.SetColumn(bar, i);
+                host.Children.Add(bar);
+            }
+        }
+
+        /// <summary>
         /// 把请求历史分桶渲染为一行迷你柱状图（按最大值归一化）。
+        /// 文本模式，保留作为 tooltip 等场景的备用；界面请用 <see cref="RenderChart"/>。
         /// </summary>
         public static string Sparkline(IList<UsageBucket> buckets)
         {

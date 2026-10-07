@@ -103,15 +103,17 @@
             <StackPanel x:Name="ChartPanel" Visibility="Collapsed" Margin="0,18,0,0">
                 <TextBlock x:Name="Chart24hTitle" Text="每小时请求（24 小时）" FontSize="11"
                            Foreground="{StaticResource DescBrush}" Margin="0,0,0,4" />
-                <TextBlock x:Name="Chart24hLine" FontSize="12" FontFamily="{StaticResource MonoFont}"
-                           Margin="0,0,0,2" />
+                <Border Height="26" Margin="0,0,0,4">
+                    <Grid x:Name="Chart24hHost" />
+                </Border>
                 <TextBlock x:Name="Chart24hMeta" FontSize="11" Foreground="{StaticResource DescBrush}"
                            Margin="0,0,0,12" />
 
                 <TextBlock x:Name="Chart7dTitle" Text="每日请求（7 天）" FontSize="11"
                            Foreground="{StaticResource DescBrush}" Margin="0,0,0,4" />
-                <TextBlock x:Name="Chart7dLine" FontSize="12" FontFamily="{StaticResource MonoFont}"
-                           Margin="0,0,0,2" />
+                <Border Height="26" Margin="0,0,0,4">
+                    <Grid x:Name="Chart7dHost" />
+                </Border>
                 <TextBlock x:Name="Chart7dMeta" FontSize="11" Foreground="{StaticResource DescBrush}" />
             </StackPanel>
 

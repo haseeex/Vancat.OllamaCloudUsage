@@ -39,10 +39,10 @@
                Placement="Top" HorizontalOffset="0" VerticalOffset="-6"
                AllowsTransparency="True" StaysOpen="True" IsHitTestVisible="False">
             <Border x:Name="HoverBorder" CornerRadius="4" Padding="10,8"
-                    BorderThickness="1" Margin="6" MaxHeight="520"
+                    BorderThickness="1" Margin="6" MaxHeight="560"
                     Background="#FF2D2D30" BorderBrush="#FF3F3F46">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel x:Name="HoverContent" MinWidth="260" MaxWidth="380" />
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="HoverContent" MinWidth="270" />
                 </ScrollViewer>
             </Border>
         </Popup>

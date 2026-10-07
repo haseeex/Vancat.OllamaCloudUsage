@@ -131,8 +131,8 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
 
                 // 请求历史图表
                 ChartPanel.Visibility = Visibility.Visible;
-                RenderChart(Chart24hLine, Chart24hMeta, usage.Hourly);
-                RenderChart(Chart7dLine, Chart7dMeta, usage.Daily);
+                RenderChart(Chart24hHost, Chart24hMeta, usage.Hourly);
+                RenderChart(Chart7dHost, Chart7dMeta, usage.Daily);
 
                 UpdateCountdowns();
             }
@@ -207,8 +207,8 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             countText.Text = Loc.T("Usage.Requests", summary.Requests.ToString("N0"));
         }
 
-        /// <summary>渲染请求历史迷你图表（含总量与峰值）。</summary>
-        private static void RenderChart(TextBlock line, TextBlock meta, UsageResponse response)
+        /// <summary>渲染请求历史柱状图（矩形绘制，底部严格对齐）与总量/峰值。</summary>
+        private static void RenderChart(Grid host, TextBlock meta, UsageResponse response)
         {
             var buckets = response.Buckets;
             var total = response.Totals.RequestCount;
@@ -221,7 +221,7 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
                 }
             }
 
-            line.Text = UsageBarRenderer.Sparkline(buckets);
+            UsageBarRenderer.RenderChart(host, buckets);
             meta.Text = Loc.T("Usage.Requests", total.ToString("N0")) + "　·　" + Loc.T("Usage.Peak", peak.ToString("N0"));
         }
 
