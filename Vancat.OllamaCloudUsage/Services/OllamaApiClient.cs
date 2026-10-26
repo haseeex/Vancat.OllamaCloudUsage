@@ -28,13 +28,33 @@ namespace Vancat.OllamaCloudUsage.Services
         public long? OutputTokens { get; set; }
     }
 
-    /// <summary>单个时间分桶（按小时或按天）。</summary>
+    /// <summary>单个模型在某个分桶/总量中的用量（仅 `group_by=model` 时返回）。</summary>
+    public sealed class UsageGroup
+    {
+        public string Model { get; set; }
+        public UsageMetrics Metrics { get; set; } = new UsageMetrics();
+
+        public long RequestCount => Metrics.RequestCount;
+    }
+
+    /// <summary>
+    /// 单个时间分桶（按小时或按天）。
+    ///
+    /// 请求 `group_by=model` 时，`Groups` 会带上前 10 名模型的明细，
+    /// 超出部分合并到 `Remainder`（官方限制）。
+    /// </summary>
     public sealed class UsageBucket
     {
         public string From { get; set; }
         public string Until { get; set; }
         public bool Partial { get; set; }
         public UsageMetrics Metrics { get; set; } = new UsageMetrics();
+
+        /// <summary>前 10 名模型的明细；未请求分组时为 null。</summary>
+        public List<UsageGroup> Groups { get; set; }
+
+        /// <summary>前 10 名之外模型的合并用量；为空时为 null。</summary>
+        public UsageMetrics Remainder { get; set; }
 
         public long RequestCount => Metrics.RequestCount;
     }
@@ -45,10 +65,25 @@ namespace Vancat.OllamaCloudUsage.Services
         public string Range { get; set; }
         public string Scope { get; set; }
         public string Granularity { get; set; }
+
+        /// <summary>请求时指定的分组维度（如 `model`）；未分组时为 null。</summary>
+        public string GroupBy { get; set; }
+
         public string From { get; set; }
         public string Until { get; set; }
         public UsageMetrics Totals { get; set; } = new UsageMetrics();
+
+        /// <summary>总量中的前 10 名模型明细（`group_by=model` 时返回）。</summary>
+        public List<UsageGroup> TotalGroups { get; set; }
+
         public List<UsageBucket> Buckets { get; set; } = new List<UsageBucket>();
+    }
+
+    /// <summary>某模型在某时间窗口内的请求次数（聚合结果）。</summary>
+    public sealed class ModelUsage
+    {
+        public string Name { get; set; }
+        public long RequestCount { get; set; }
     }
 
     /// <summary>旧版计划的一个配额窗口（5 小时会话 / 每周），按剩余百分比计。</summary>
@@ -181,10 +216,11 @@ namespace Vancat.OllamaCloudUsage.Services
 
         /// <summary>
         /// 拉取用量并返回原始 JSON（用于缓存写入，保留服务端的字段名）。
+        /// 同时请求 `group_by=model`，以便按模型拆分用量。
         /// </summary>
         public async Task<JObject> FetchUsageJsonAsync(string apiKey, UsageRange range, CancellationToken cancellationToken)
         {
-            var url = UsageUrl + "?range=" + ToRangeText(range);
+            var url = UsageUrl + "?range=" + ToRangeText(range) + "&group_by=model";
             return await GetJsonAsync(url, apiKey, cancellationToken).ConfigureAwait(false);
         }
 
@@ -298,7 +334,7 @@ namespace Vancat.OllamaCloudUsage.Services
 
         internal static UsageResponse ParseUsage(JObject root)
         {
-            return new UsageResponse
+            var response = new UsageResponse
             {
                 Range = RequireString(root, "range", "range"),
                 Scope = RequireString(root, "scope", "scope"),
@@ -306,8 +342,18 @@ namespace Vancat.OllamaCloudUsage.Services
                 From = RequireString(root, "from", "from"),
                 Until = RequireString(root, "until", "until"),
                 Totals = ParseMetrics(root["totals"], "totals"),
+                TotalGroups = ParseGroups(root["totals"]?["groups"], "totals.groups"),
                 Buckets = ParseBuckets(root["buckets"], "buckets"),
             };
+
+            // group_by 仅在实际请求分组时返回。
+            var groupBy = root["group_by"];
+            if (groupBy != null && groupBy.Type == JTokenType.String)
+            {
+                response.GroupBy = groupBy.Value<string>();
+            }
+
+            return response;
         }
 
         internal static BalanceResponse ParseBalance(JObject root)
@@ -386,6 +432,40 @@ namespace Vancat.OllamaCloudUsage.Services
                     From = RequireString(item, "from", name + "[" + i + "].from"),
                     Until = RequireString(item, "until", name + "[" + i + "].until"),
                     Partial = item["partial"] != null && item["partial"].Type == JTokenType.Boolean && item["partial"].Value<bool>(),
+                    Metrics = ParseMetrics(item, name + "[" + i + "]"),
+                    Groups = ParseGroups(item["groups"], name + "[" + i + "].groups"),
+                    Remainder = item["remainder"] != null
+                        ? ParseMetrics(item["remainder"], name + "[" + i + "].remainder")
+                        : null,
+                });
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 解析 `groups` 数组（前 10 名模型明细）。字段缺失时返回 null（而非空列表），
+        /// 以区分「未请求分组」与「分组结果为空」。
+        /// </summary>
+        private static List<UsageGroup> ParseGroups(JToken token, string name)
+        {
+            if (token == null)
+            {
+                return null;
+            }
+
+            if (!(token is JArray array))
+            {
+                throw new UsageApiException(Loc.T("Err.InvalidField", name));
+            }
+
+            var result = new List<UsageGroup>();
+            for (var i = 0; i < array.Count; i++)
+            {
+                var item = RequireObject(array[i], name + "[" + i + "]");
+                result.Add(new UsageGroup
+                {
+                    Model = RequireString(item, "model", name + "[" + i + "].model"),
                     Metrics = ParseMetrics(item, name + "[" + i + "]"),
                 });
             }

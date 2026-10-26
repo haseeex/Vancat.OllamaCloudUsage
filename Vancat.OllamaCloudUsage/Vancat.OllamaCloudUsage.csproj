@@ -8,7 +8,7 @@
     <Nullable>disable</Nullable>
     <RootNamespace>Vancat.OllamaCloudUsage</RootNamespace>
     <AssemblyName>Vancat.OllamaCloudUsage</AssemblyName>
-    <Version>1.4.2</Version>
+    <Version>1.5.0</Version>
     <Authors>vancat</Authors>
     <Product>Ollama Cloud 用量监控</Product>
     <Description>在 Visual Studio 中查看 Ollama Cloud 用量与限额。</Description>
@@ -33,6 +33,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MessagePack" Version="2.5.301" />
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="18.5.40034">
       <PrivateAssets>all</PrivateAssets>

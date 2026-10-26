@@ -12,14 +12,24 @@ namespace Vancat.OllamaCloudUsage.Views
     /// <summary>
     /// 用量条与图表的共用渲染逻辑（状态栏弹窗与工具窗口共用）。
     ///
-    /// 新版 API 不再提供模型维度数据，用量条改为**单色分级**：
-    /// 蓝色（&lt;75%）→ 琥珀色（≥75%）→ 红色（≥90%）。
+    /// 用量条两种形态：
+    /// - **按模型分段堆叠**（`group_by=model` 有数据时）：蓝色调色板，每模型一段；
+    /// - **单色分级**（无模型数据时）：蓝色（&lt;75%）→ 琥珀色（≥75%）→ 红色（≥90%）。
     /// </summary>
     internal static class UsageBarRenderer
     {
         /// <summary>用量条分级配色阈值。</summary>
         private const double AmberThreshold = 0.75;
         private const double RedThreshold = 0.9;
+
+        /// <summary>模型分段条的蓝色调色板（按索引分配）。</summary>
+        private static readonly string[] Palette =
+        {
+            "#2563EB", "#3B82F6", "#4F46E5", "#60A5FA", "#1D4ED8", "#6366F1", "#818CF8", "#93C5FD",
+        };
+
+        /// <summary>模型列表各数据列之间的间距。</summary>
+        private const double ColumnGap = 8;
 
         /// <summary>迷你图表的字符高度级别（与 VS Code 版一致的 8 级）。</summary>
         private static readonly string[] SparkChars = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
@@ -112,6 +122,188 @@ namespace Vancat.OllamaCloudUsage.Views
         public static void RenderCreditsBar(Grid host, double usedFraction)
         {
             RenderBar(host, usedFraction);
+        }
+
+        /// <summary>模型分段条的调色板画刷（按索引循环取色）。</summary>
+        public static SolidColorBrush ModelBrush(int index)
+        {
+            return Frozen(Palette[index % Palette.Length]);
+        }
+
+        /// <summary>
+        /// 绘制**按模型分段堆叠**的用量条：已填充部分（= 窗口用量）按各模型
+        /// 请求占比切分，每段一种蓝色调。
+        ///
+        /// 无模型数据时自动退回单色分级条。
+        ///
+        /// 列宽算法（务必保证总和 = 1，否则填充比例失真）：
+        ///   每段 = (模型请求数 ÷ 总请求数) × 已用比例
+        ///   剩余 = 1 − 已用比例
+        /// </summary>
+        public static void RenderSegmentedBar(Grid host, WindowSummary summary)
+        {
+            host.ColumnDefinitions.Clear();
+            host.Children.Clear();
+
+            var filled = Math.Max(0, Math.Min(1, summary?.Used ?? 0));
+            var models = summary?.Models;
+
+            var total = 0L;
+            if (models != null)
+            {
+                foreach (var model in models)
+                {
+                    total += model.RequestCount;
+                }
+            }
+
+            // 无模型数据或零用量 → 单色分级条。
+            if (models == null || models.Count == 0 || total <= 0 || filled <= 0)
+            {
+                RenderBar(host, filled);
+                return;
+            }
+
+            for (var i = 0; i < models.Count; i++)
+            {
+                var model = models[i];
+                host.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength((double)model.RequestCount / total * filled, GridUnitType.Star),
+                });
+
+                var segment = new Border
+                {
+                    Background = ModelBrush(i),
+                    ToolTip = model.Name + "\n" + Loc.T("Models.Requests", model.RequestCount.ToString("N0")),
+                };
+                Grid.SetColumn(segment, i);
+                host.Children.Add(segment);
+            }
+
+            // 未使用部分（灰底由外层容器提供）。
+            host.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(Math.Max(1 - filled, 0.0001), GridUnitType.Star),
+            });
+        }
+
+        /// <summary>
+        /// 渲染模型明细列表：色点 + 名称 + 占窗口配额比例 + 请求数 + 剩余预测。
+        ///
+        /// 各数据列使用共享尺寸组，保证多行纵向对齐。
+        /// </summary>
+        public static void RenderModelList(StackPanel host, WindowSummary summary, double fontSize = 11)
+        {
+            host.Children.Clear();
+
+            var models = summary?.Models;
+            if (models == null || models.Count == 0)
+            {
+                host.Children.Add(new TextBlock
+                {
+                    Text = Loc.T("Models.None"),
+                    FontSize = fontSize,
+                    Foreground = MutedBrush,
+                });
+                return;
+            }
+
+            // 共享尺寸作用域：让各行的「占窗口 / 次数 / 剩余」列取相同宽度。
+            Grid.SetIsSharedSizeScope(host, true);
+
+            var capacity = QuotaPredictor.WindowCapacity(summary.Requests, summary.Used);
+
+            for (var i = 0; i < models.Count; i++)
+            {
+                var model = models[i];
+                var row = new Grid { Margin = new Thickness(0, 1.5, 0, 1.5) };
+
+                // 列：色点 | 名称(*) | 占窗口 | 次数 | 剩余
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "ModelShare" });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "ModelCount" });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "ModelRemain" });
+
+                var dot = new Ellipse
+                {
+                    Width = 7,
+                    Height = 7,
+                    Margin = new Thickness(0, 0, 6, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Fill = ModelBrush(i),
+                };
+                Grid.SetColumn(dot, 0);
+                row.Children.Add(dot);
+
+                var name = new TextBlock
+                {
+                    Text = model.Name,
+                    FontSize = fontSize,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                Grid.SetColumn(name, 1);
+                row.Children.Add(name);
+
+                // 占窗口配额比例（窗口用量 × 该模型请求占比）。
+                var windowShare = QuotaPredictor.ModelWindowShare(summary.Used, summary.Requests, model.RequestCount);
+                if (windowShare.HasValue)
+                {
+                    var share = new TextBlock
+                    {
+                        Text = Loc.T("Models.WindowShare", Config.FormatSharePercent(windowShare.Value)),
+                        FontSize = fontSize,
+                        Foreground = MutedBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Margin = new Thickness(ColumnGap, 0, 0, 0),
+                        ToolTip = Loc.T("Models.WindowShareTip",
+                            Config.FormatSharePercent(windowShare.Value),
+                            Config.FormatUsagePercent(summary.Used)),
+                    };
+                    Grid.SetColumn(share, 2);
+                    UseTabularNumbers(share);
+                    row.Children.Add(share);
+                }
+
+                var count = new TextBlock
+                {
+                    Text = Loc.T("Models.Requests", model.RequestCount.ToString("N0")),
+                    FontSize = fontSize,
+                    Foreground = MutedBrush,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(ColumnGap, 0, 0, 0),
+                };
+                Grid.SetColumn(count, 3);
+                UseTabularNumbers(count);
+                row.Children.Add(count);
+
+                var estimate = QuotaPredictor.EstimateRemainingRequestsForModel(
+                    model.RequestCount, summary.Requests, summary.Used);
+                if (estimate.HasValue)
+                {
+                    var remain = new TextBlock
+                    {
+                        Text = Loc.T("Models.Remaining", QuotaPredictor.Format(estimate.Value)),
+                        FontSize = fontSize,
+                        Foreground = MutedBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Margin = new Thickness(ColumnGap, 0, 0, 0),
+                        ToolTip = Loc.T("Models.RemainingTip",
+                            QuotaPredictor.Format(capacity ?? 0),
+                            QuotaPredictor.Format(estimate.Value)),
+                    };
+                    Grid.SetColumn(remain, 4);
+                    UseTabularNumbers(remain);
+                    row.Children.Add(remain);
+                }
+
+                host.Children.Add(row);
+            }
         }
 
         /// <summary>

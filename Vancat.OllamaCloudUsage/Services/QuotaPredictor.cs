@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Vancat.OllamaCloudUsage.Services
 {
@@ -19,6 +20,9 @@ namespace Vancat.OllamaCloudUsage.Services
 
         /// <summary>按当前速度估算的剩余可请求次数；无法计算时为 null。</summary>
         public long? Estimate { get; set; }
+
+        /// <summary>窗口内各模型的请求数，按请求数降序排列。</summary>
+        public List<ModelUsage> Models { get; set; } = new List<ModelUsage>();
     }
 
     /// <summary>
@@ -46,19 +50,26 @@ namespace Vancat.OllamaCloudUsage.Services
         }
 
         /// <summary>
-        /// 结合 balance 窗口与用量分桶，汇总出窗口的用量、请求数、重置时间与剩余预测。
+        /// 结合 balance 窗口与用量分桶，汇总出窗口的用量、请求数、重置时间、
+        /// 剩余预测与模型明细。
         /// </summary>
         public static WindowSummary SummarizeWindow(
             double remainingPercent,
             string resetsAt,
             long windowMs,
-            System.Collections.Generic.IList<UsageBucket> buckets)
+            IList<UsageBucket> buckets)
         {
             var resetMs = ResetTime.ParseTimestampMs(resetsAt);
             var used = UsedFraction(remainingPercent);
-            var requests = resetMs > 0
-                ? ResetTime.SumRequestsInRange(buckets, ResetTime.WindowStartMs(resetMs, windowMs), resetMs)
-                : 0;
+
+            long requests = 0;
+            List<ModelUsage> models = null;
+            if (resetMs > 0)
+            {
+                var fromMs = ResetTime.WindowStartMs(resetMs, windowMs);
+                requests = ResetTime.SumRequestsInRange(buckets, fromMs, resetMs);
+                models = ResetTime.SumModelUsageInRange(buckets, fromMs, resetMs);
+            }
 
             return new WindowSummary
             {
@@ -66,6 +77,7 @@ namespace Vancat.OllamaCloudUsage.Services
                 Requests = requests,
                 ResetMs = resetMs,
                 Estimate = EstimateRemainingRequests(requests, used),
+                Models = models ?? new List<ModelUsage>(),
             };
         }
 
@@ -99,12 +111,74 @@ namespace Vancat.OllamaCloudUsage.Services
             return (long)Math.Min(estimate, MaxEstimate);
         }
 
-        /// <summary>把预测值格式化为界面文本（千分位；达到上限时追加 + 号）。</summary>
-        public static string Format(long estimate)
+        /// <summary>
+        /// 窗口容量：按当前平均消耗水平，重置前总共可请求的次数
+        /// （= 窗口请求数 ÷ 已用比例）。返回 null 表示数据不足。
+        /// </summary>
+        public static long? WindowCapacity(long requestsInWindow, double usedFraction)
         {
-            return estimate >= MaxEstimate
-                ? estimate.ToString("N0") + "+"
-                : estimate.ToString("N0");
+            if (requestsInWindow <= 0 || usedFraction <= 0)
+            {
+                return null;
+            }
+
+            var capacity = requestsInWindow / usedFraction;
+            if (double.IsNaN(capacity) || double.IsInfinity(capacity) || capacity < 0)
+            {
+                return null;
+            }
+
+            return (long)Math.Min(capacity, MaxEstimate);
+        }
+
+        /// <summary>
+        /// 预测单个模型在窗口内剩余还可请求的次数（假设仅使用该模型）。
+        ///
+        /// 公式：窗口容量 − 该模型已用次数
+        ///
+        /// 为什么不是「模型请求数 ÷ used − 模型请求数」：那样等于假设该模型的
+        /// 请求数消耗了整个窗口的用量。例如 glm 只用 3 次（占周请求 0.14%），
+        /// 却会算出「剩余 22 次」，明显荒谬。按等单价分摊时，每个模型单独使用
+        /// 的窗口总容量都相同（= 窗口请求数 ÷ used），差别只在于各自已用掉多少。
+        /// </summary>
+        public static long? EstimateRemainingRequestsForModel(
+            long modelRequestCount, long requestsInWindow, double usedFraction)
+        {
+            if (modelRequestCount <= 0)
+            {
+                return null;
+            }
+
+            var capacity = WindowCapacity(requestsInWindow, usedFraction);
+            if (!capacity.HasValue)
+            {
+                return null;
+            }
+
+            if (usedFraction >= 1)
+            {
+                return 0;
+            }
+
+            var remaining = capacity.Value - modelRequestCount;
+            return remaining < 0 ? 0 : remaining;
+        }
+
+        /// <summary>
+        /// 某模型占窗口总配额的比例 = 窗口用量 × 该模型的请求占比。
+        ///
+        /// 例：周窗口已用 11.9%、某模型占请求 58.1% → 该模型占用窗口配额 6.9%。
+        /// 返回 null 表示窗口无用量或该模型无请求记录。
+        /// </summary>
+        public static double? ModelWindowShare(double usedFraction, long requestsInWindow, long modelRequestCount)
+        {
+            if (usedFraction <= 0)
+            {
+                return null;
+            }
+
+            var share = RequestShare(modelRequestCount, requestsInWindow);
+            return share.HasValue ? usedFraction * share.Value : (double?)null;
         }
 
         /// <summary>
@@ -113,7 +187,20 @@ namespace Vancat.OllamaCloudUsage.Services
         /// </summary>
         public static double? RequestShare(long part, long total)
         {
-            return total > 0 ? (double)part / total : (double?)null;
+            if (total <= 0 || part <= 0)
+            {
+                return null;
+            }
+
+            return (double)part / total;
+        }
+
+        /// <summary>把预测值格式化为界面文本（千分位；达到上限时追加 + 号）。</summary>
+        public static string Format(long estimate)
+        {
+            return estimate >= MaxEstimate
+                ? estimate.ToString("N0") + "+"
+                : estimate.ToString("N0");
         }
     }
 }

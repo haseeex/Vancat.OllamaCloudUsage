@@ -59,6 +59,8 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             AddKeyButton.Content = Loc.T("Panel.AddKey");
             SessionTitle.Text = Loc.T("Panel.SessionWindow");
             WeeklyTitle.Text = Loc.T("Panel.WeeklyWindow");
+            SessionModelsLabel.Text = Loc.T("Panel.SessionModels");
+            WeeklyModelsLabel.Text = Loc.T("Panel.WeeklyModels");
             CreditsTitle.Text = Loc.T("Panel.IncludedCredits");
             Chart24hTitle.Text = Loc.T("Usage.24h");
             Chart7dTitle.Text = Loc.T("Usage.7d");
@@ -119,8 +121,8 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
                         ResetTime.WeekMs,
                         usage.Daily.Buckets);
 
-                    RenderWindow(SessionBar, SessionPercent, SessionReset, SessionCount, SessionEstimate, session);
-                    RenderWindow(WeeklyBar, WeeklyPercent, WeeklyReset, WeeklyCount, WeeklyEstimate, weekly);
+                    RenderWindow(SessionBar, SessionPercent, SessionReset, SessionCount, SessionEstimate, SessionModels, session);
+                    RenderWindow(WeeklyBar, WeeklyPercent, WeeklyReset, WeeklyCount, WeeklyEstimate, WeeklyModels, weekly);
                 }
                 else
                 {
@@ -196,9 +198,13 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
             }
         }
 
-        /// <summary>渲染一个配额窗口：百分比 + 剩余预测 + 用量条 + 倒计时 + 请求数。</summary>
+        /// <summary>
+        /// 渲染一个配额窗口：百分比 + 剩余预测 + 分段用量条 + 倒计时 +
+        /// 请求数 + 模型明细列表。
+        /// </summary>
         private static void RenderWindow(
-            Grid barHost, TextBlock percentText, TextBlock resetText, TextBlock countText, TextBlock estimateText, WindowSummary summary)
+            Grid barHost, TextBlock percentText, TextBlock resetText, TextBlock countText,
+            TextBlock estimateText, StackPanel modelHost, WindowSummary summary)
         {
             percentText.Text = Loc.T("Panel.Used", Config.FormatUsagePercent(summary.Used));
 
@@ -213,12 +219,15 @@ namespace Vancat.OllamaCloudUsage.ToolWindows
                 estimateText.Visibility = Visibility.Collapsed;
             }
 
-            UsageBarRenderer.RenderBar(barHost, summary.Used);
+            // 有模型数据时按模型分段堆叠，否则单色分级。
+            UsageBarRenderer.RenderSegmentedBar(barHost, summary);
 
             resetText.Tag = summary.ResetMs;
             UpdateCountdownText(resetText, summary.ResetMs);
 
             countText.Text = Loc.T("Usage.Requests", summary.Requests.ToString("N0"));
+
+            UsageBarRenderer.RenderModelList(modelHost, summary, fontSize: 11);
         }
 
         /// <summary>渲染请求历史柱状图（矩形绘制，底部严格对齐）与总量/峰值。</summary>

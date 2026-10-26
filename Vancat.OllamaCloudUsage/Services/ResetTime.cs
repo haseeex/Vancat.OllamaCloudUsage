@@ -79,6 +79,74 @@ namespace Vancat.OllamaCloudUsage.Services
             return total;
         }
 
+        /// <summary>
+        /// 聚合与 `[fromMs, untilMs)` 重叠的分桶中各模型的请求数，按请求数**降序**排列。
+        ///
+        /// 用于 5 小时会话窗口：它的边界与响应自身的 range 不一致，因此不能直接
+        /// 复用 `totals.groups`，必须逐分桶累加。
+        ///
+        /// 注意：官方限制每组最多返回前 10 名模型，超出部分合并到 `remainder`
+        /// （这里不计入模型明细，以免出现一个名为「其他」的假模型）。
+        /// </summary>
+        public static List<ModelUsage> SumModelUsageInRange(IList<UsageBucket> buckets, long fromMs, long untilMs)
+        {
+            var totals = new Dictionary<string, long>(StringComparer.Ordinal);
+            var result = new List<ModelUsage>();
+
+            if (buckets == null)
+            {
+                return result;
+            }
+
+            foreach (var bucket in buckets)
+            {
+                var bucketFrom = ParseTimestampMs(bucket.From);
+                var bucketUntil = ParseTimestampMs(bucket.Until);
+                if (bucketFrom == 0 || bucketUntil == 0)
+                {
+                    continue;
+                }
+
+                if (bucketUntil <= fromMs || bucketFrom >= untilMs)
+                {
+                    continue;
+                }
+
+                if (bucket.Groups == null)
+                {
+                    continue;
+                }
+
+                foreach (var group in bucket.Groups)
+                {
+                    if (string.IsNullOrEmpty(group.Model))
+                    {
+                        continue;
+                    }
+
+                    totals.TryGetValue(group.Model, out var current);
+                    totals[group.Model] = current + group.RequestCount;
+                }
+            }
+
+            foreach (var pair in totals)
+            {
+                if (pair.Value > 0)
+                {
+                    result.Add(new ModelUsage { Name = pair.Key, RequestCount = pair.Value });
+                }
+            }
+
+            // 按请求数降序；相同请求数时按名称升序，保证顺序稳定。
+            result.Sort((a, b) =>
+            {
+                var byCount = b.RequestCount.CompareTo(a.RequestCount);
+                return byCount != 0 ? byCount : string.CompareOrdinal(a.Name, b.Name);
+            });
+
+            return result;
+        }
+
         /// <summary>将剩余时间格式化为「X 天 / X 小时 Y 分钟 / X 分钟 / X 秒」。</summary>
         public static string FormatRemaining(TimeSpan remaining)
         {

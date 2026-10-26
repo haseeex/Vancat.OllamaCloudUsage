@@ -269,7 +269,10 @@ namespace Vancat.OllamaCloudUsage.Views
             });
         }
 
-        /// <summary>窗口区块：标题 + 百分比 + 剩余预测 + 用量条 + 重置倒计时 + 请求数。</summary>
+        /// <summary>
+        /// 窗口区块：标题 + 百分比 + 剩余预测 + 分段用量条 + 重置倒计时 +
+        /// 请求数 + 模型明细列表。
+        /// </summary>
         private void AddWindowSection(string title, WindowSummary summary, bool isFirst)
         {
             AddSeparator(isFirst);
@@ -295,7 +298,7 @@ namespace Vancat.OllamaCloudUsage.Views
             head.Children.Add(new TextBlock { Text = title, FontSize = 11 });
             HoverContent.Children.Add(head);
 
-            // 用量条（单色分级）
+            // 用量条（有模型数据时按模型分段堆叠，否则单色分级）
             var barHost = new Grid();
             var barBorder = new Border
             {
@@ -305,7 +308,7 @@ namespace Vancat.OllamaCloudUsage.Views
                 ClipToBounds = true,
                 Child = barHost,
             };
-            UsageBarRenderer.RenderBar(barHost, summary.Used);
+            UsageBarRenderer.RenderSegmentedBar(barHost, summary);
             HoverContent.Children.Add(barBorder);
 
             // 重置倒计时（Tag 存重置时刻，定时器每秒刷新）
@@ -327,6 +330,14 @@ namespace Vancat.OllamaCloudUsage.Views
                 Margin = new Thickness(0, 3, 0, 0),
                 Foreground = UsageBarRenderer.MutedBrush,
             });
+
+            // 模型明细列表
+            if (summary.Models.Count > 0)
+            {
+                var models = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+                UsageBarRenderer.RenderModelList(models, summary, fontSize: 10);
+                HoverContent.Children.Add(models);
+            }
         }
 
         /// <summary>信用计划区块：包含额度进度 + 购买余额。</summary>

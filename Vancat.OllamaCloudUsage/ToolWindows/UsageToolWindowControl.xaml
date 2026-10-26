@@ -60,6 +60,9 @@
                 </DockPanel>
                 <TextBlock x:Name="SessionCount" FontSize="11" Margin="0,4,0,0"
                            Foreground="{StaticResource DescBrush}" />
+                <TextBlock x:Name="SessionModelsLabel" Text="本窗口使用的模型" FontSize="11" Margin="0,12,0,4"
+                           Foreground="{StaticResource DescBrush}" />
+                <StackPanel x:Name="SessionModels" />
             </StackPanel>
 
             <Separator Margin="0,18,0,18" x:Name="MiddleSeparator" Visibility="Collapsed" />
@@ -80,6 +83,9 @@
                 </DockPanel>
                 <TextBlock x:Name="WeeklyCount" FontSize="11" Margin="0,4,0,0"
                            Foreground="{StaticResource DescBrush}" />
+                <TextBlock x:Name="WeeklyModelsLabel" Text="本周使用的模型" FontSize="11" Margin="0,12,0,4"
+                           Foreground="{StaticResource DescBrush}" />
+                <StackPanel x:Name="WeeklyModels" />
             </StackPanel>
 
             <!-- 信用计划（包含额度 + 购买余额） -->
